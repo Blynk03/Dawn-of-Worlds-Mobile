@@ -1,0 +1,120 @@
+/**
+ * Types for the Supabase database, matching supabase/migrations.
+ *
+ * Written by hand in the shape `supabase gen types typescript` produces. Once someone has the
+ * Supabase CLI linked to the project, regenerate with:
+ *   npx supabase gen types typescript --project-id ypbvbyijrpiqwfymqnpb > src/lib/database.types.ts
+ */
+export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
+
+export type Database = {
+  public: {
+    Tables: {
+      profiles: {
+        Row: {
+          id: string;
+          display_name: string;
+          avatar_url: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id: string;
+          display_name: string;
+          avatar_url?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          display_name?: string;
+          avatar_url?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      worlds: {
+        Row: {
+          id: string;
+          name: string;
+          ruleset_id: string;
+          status: 'lobby' | 'active' | 'finished';
+          created_by: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          ruleset_id?: string;
+          status?: 'lobby' | 'active' | 'finished';
+          created_by?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          name?: string;
+          ruleset_id?: string;
+          status?: 'lobby' | 'active' | 'finished';
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'worlds_created_by_fkey';
+            columns: ['created_by'];
+            isOneToOne: false;
+            referencedRelation: 'profiles';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      world_members: {
+        Row: {
+          world_id: string;
+          user_id: string;
+          role: 'host' | 'player';
+          is_gm: boolean;
+          joined_at: string;
+        };
+        Insert: {
+          world_id: string;
+          user_id: string;
+          role?: 'host' | 'player';
+          is_gm?: boolean;
+          joined_at?: string;
+        };
+        Update: {
+          role?: 'host' | 'player';
+          is_gm?: boolean;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'world_members_world_id_fkey';
+            columns: ['world_id'];
+            isOneToOne: false;
+            referencedRelation: 'worlds';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'world_members_user_id_fkey';
+            columns: ['user_id'];
+            isOneToOne: false;
+            referencedRelation: 'profiles';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+    };
+    Views: { [_ in never]: never };
+    Functions: {
+      is_world_member: { Args: { target_world: string }; Returns: boolean };
+      is_world_host: { Args: { target_world: string }; Returns: boolean };
+      shares_world_with: { Args: { other_user: string }; Returns: boolean };
+    };
+    Enums: { [_ in never]: never };
+    CompositeTypes: { [_ in never]: never };
+  };
+};
+
+export type Profile = Database['public']['Tables']['profiles']['Row'];
+export type World = Database['public']['Tables']['worlds']['Row'];
+export type WorldMember = Database['public']['Tables']['world_members']['Row'];

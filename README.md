@@ -10,27 +10,29 @@ Planning lives in Jira (project **DOW**). Stories are grouped into the **MVP**, 
 - TypeScript (strict)
 - Jest + `jest-expo` + React Native Testing Library
 - ESLint (`eslint-config-expo`) + Prettier
-- Backend (planned, DOW-13): Supabase
+- [Supabase](https://supabase.com) for sign-in (email magic link) and the database. See [docs/supabase-setup.md](docs/supabase-setup.md)
 
 ## Getting started
 
 ```bash
 npm install
-npm start          # then press i (iOS simulator), a (Android emulator) or w (web)
+cp .env.example .env.local   # add the Supabase URL and publishable key (ask the project owner)
+npm start                    # then press i (iOS simulator), a (Android emulator) or w (web)
 ```
 
 Scan the QR code with Expo Go to run it on your own phone or tablet.
 
 ## Scripts
 
-| Command             | What it does                                           |
-| ------------------- | ------------------------------------------------------ |
-| `npm start`         | Start the Expo dev server                              |
-| `npm test`          | Run unit tests                                         |
-| `npm run typecheck` | TypeScript type check                                  |
-| `npm run lint`      | ESLint                                                 |
-| `npm run format`    | Format all files with Prettier                         |
-| `npm run check`     | Typecheck + lint + format check + tests (what CI runs) |
+| Command                | What it does                                                  |
+| ---------------------- | ------------------------------------------------------------- |
+| `npm start`            | Start the Expo dev server                                     |
+| `npm test`             | Run unit tests                                                |
+| `npm run typecheck`    | TypeScript type check                                         |
+| `npm run lint`         | ESLint                                                        |
+| `npm run format`       | Format all files with Prettier                                |
+| `npm run check`        | Typecheck + lint + format check + tests (what CI runs)        |
+| `./scripts/test-db.sh` | Test database migrations and access rules on a local Postgres |
 
 Add dependencies with `npx expo install <package>` so you get versions compatible with the SDK.
 
@@ -43,8 +45,13 @@ src/
   hooks/        React hooks
   layout/       Phone/tablet breakpoints
   navigation/   Tab definitions shared by native and web tab bars
+  auth/         Sign-in state (AuthProvider / useAuth) and magic-link handling
+  lib/          Supabase client, config and database types
   rules/        Pure TypeScript rules engine (no React), unit tested against the PDF rules
   constants/    Theme colors, spacing, fonts
+supabase/
+  migrations/   Database schema and row-level security (run in order)
+  tests/        Access-rule tests, run by scripts/test-db.sh
 ```
 
 ### Phones vs tablets
