@@ -4,7 +4,7 @@ The app uses the Supabase project **`ypbvbyijrpiqwfymqnpb`** for sign-in and dat
 
 ## 1. Create the tables
 
-Pick one of these:
+Paste the **contents** of the migration file, not its file name. Pick one of these:
 
 - **Dashboard:** open **SQL Editor → New query**, paste the contents of `supabase/migrations/20261102000000_profiles_worlds.sql`, then click **Run**.
 - **CLI:** `npx supabase login`, then `npx supabase link --project-ref ypbvbyijrpiqwfymqnpb`, then `npx supabase db push`.
@@ -25,19 +25,37 @@ Go to **Authentication → URL Configuration**:
 
 Without these, the email link opens Supabase's site instead of the app.
 
-## 3. Put the code in the sign-in email
+## 3. Send email through your own SMTP (needed for friends to get emails)
 
-The sign-in screen accepts either the link or a 6-digit code. Typing the code is handy when the email is on a different device from the one you're signing in on. Supabase only sends the code if the email template includes it.
+Supabase's built-in email is for testing only. It sends a couple of emails an hour, may only deliver to members of your Supabase organization, and on newer free projects it locks the email templates. Custom SMTP works on the free plan and fixes all three.
 
-Go to **Authentication → Emails → Templates → Magic Link** and add a line like:
+**No domain (what this project uses): Gmail**
+
+1. Create a dedicated Gmail account for the app, so no personal inbox is involved.
+2. On that account, turn on 2-Step Verification, then create an **app password** at myaccount.google.com (search "App passwords").
+3. In Supabase, go to **Authentication → Emails → SMTP Settings** and turn on **Enable Custom SMTP**:
+   - Host `smtp.gmail.com`, port `587` (465 also works)
+   - Username and sender email: the full Gmail address
+   - Password: the app password
+   - Sender name: `Dawn of Worlds`
+
+Gmail allows a few hundred emails a day, which is plenty for a group of friends. The first emails may land in spam, so ask friends to mark one "Not spam".
+
+**With a domain later:** a transactional provider like Resend (free plan) is more reliable. It needs DNS records on a domain you own.
+
+Supabase also has its own hourly email limit. Raise it if needed under **Authentication → Rate Limits**.
+
+## 4. Put the code in the sign-in email
+
+The sign-in screen accepts either the link or a 6-digit code. The code is handy when the email is open on a different device. Templates can only be edited once custom SMTP (step 3) is on.
+
+Go to **Authentication → Emails → Templates → Magic Link** and set the body to something like:
 
 ```html
+<h2>Sign in to Dawn of Worlds</h2>
+<p><a href="{{ .ConfirmationURL }}">Tap here to sign in</a></p>
 <p>Or enter this code in the app: <strong>{{ .Token }}</strong></p>
 ```
-
-## 4. Make sure emails reach your friends
-
-Supabase's built-in email service is meant for testing. It has a low hourly limit and may only deliver to members of your Supabase organization. For a group of friends, set up a custom SMTP provider (for example Resend, Postmark or SendGrid) under **Project Settings → Authentication → SMTP Settings**. The alternative is to invite each friend to the Supabase organization. Check the dashboard for the current limits.
 
 ## 5. Local development
 
