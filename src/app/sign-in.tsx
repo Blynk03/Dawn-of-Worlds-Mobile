@@ -88,7 +88,7 @@ export default function SignInScreen() {
             label="Code from the email"
             value={code}
             onChangeText={setCode}
-            placeholder="123456"
+            placeholder="12345678"
             keyboardType="number-pad"
             autoComplete="one-time-code"
             textContentType="oneTimeCode"

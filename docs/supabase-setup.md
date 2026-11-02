@@ -47,7 +47,7 @@ Supabase also has its own hourly email limit. Raise it if needed under **Authent
 
 ## 4. Put the code in the sign-in email
 
-The sign-in screen accepts either the link or a 6-digit code. The code is handy when the email is open on a different device. Templates can only be edited once custom SMTP (step 3) is on.
+The sign-in screen accepts either the link or the code from the email (6–10 digits; this project sends 8). The code is handy when the email is open on a different device. Templates can only be edited once custom SMTP (step 3) is on.
 
 Go to **Authentication → Emails → Templates → Magic Link** and set the body to something like:
 

@@ -3,7 +3,7 @@ export function looksLikeEmail(value: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
 }
 
-/** Supabase email codes are 6 digits by default (configurable up to 10). */
+/** Supabase email codes are 6–10 digits (the length is a project setting; this project sends 8). */
 export function looksLikeEmailCode(value: string): boolean {
   return /^\d{6,10}$/.test(value.trim());
 }
