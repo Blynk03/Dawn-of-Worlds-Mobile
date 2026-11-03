@@ -1,0 +1,94 @@
+{
+  "id": "classic",
+  "name": "Classic (Pesall 2005)",
+  "source": "Dawn of Worlds, 1st ed. (July 2005), section III, Table of Powers",
+  "income": {
+    "dice": { "count": 2, "sides": 6 },
+    "lowPool": { "threshold": 5, "bonusPerTurn": 1, "maxBonus": 3 }
+  },
+  "ages": [
+    { "age": 1, "name": "First Age", "focus": "Land", "yearsPerRound": 500 },
+    { "age": 2, "name": "Second Age", "focus": "Races", "yearsPerRound": 100 },
+    { "age": 3, "name": "Third Age", "focus": "Relations", "yearsPerRound": 5 }
+  ],
+  "ageTransition": { "minRounds": 5, "anyPlayerAfterRounds": 10 },
+  "powers": [
+    {
+      "id": "shapeLand",
+      "name": "Shape Land",
+      "category": "land",
+      "costs": [3, 5, 8],
+      "perArea": true
+    },
+    {
+      "id": "shapeClimate",
+      "name": "Shape Climate",
+      "category": "land",
+      "costs": [2, 4, 6],
+      "perArea": true
+    },
+    { "id": "createRace", "name": "Create Race", "category": "races", "costs": [22, 6, 15] },
+    { "id": "createSubrace", "name": "Create Subrace", "category": "races", "costs": [12, 4, 10] },
+    {
+      "id": "commandRace",
+      "name": "Command Race",
+      "category": "races",
+      "costs": [8, 4, 3],
+      "requiresPresence": true
+    },
+    {
+      "id": "commandCity",
+      "name": "Command City",
+      "category": "cities",
+      "costs": [6, 4, 2],
+      "requiresPresence": true
+    },
+    {
+      "id": "advanceCivilization",
+      "name": "Advance Civilization",
+      "category": "races",
+      "costs": [10, 5, 6]
+    },
+    { "id": "advanceCity", "name": "Advance City", "category": "cities", "costs": [8, 4, 5] },
+    {
+      "id": "purifyCivilization",
+      "name": "Purify Civilization (+1 alignment)",
+      "category": "alignment",
+      "costs": [5, 3, 4],
+      "oncePerTargetPerTurn": true
+    },
+    {
+      "id": "corruptCivilization",
+      "name": "Corrupt Civilization (-1 alignment)",
+      "category": "alignment",
+      "costs": [4, 3, 3],
+      "oncePerTargetPerTurn": true
+    },
+    {
+      "id": "purifyCity",
+      "name": "Purify City (+1 alignment)",
+      "category": "alignment",
+      "costs": [4, 3, 3],
+      "oncePerTargetPerTurn": true
+    },
+    {
+      "id": "corruptCity",
+      "name": "Corrupt City (-1 alignment)",
+      "category": "alignment",
+      "costs": [3, 2, 2],
+      "oncePerTargetPerTurn": true
+    },
+    { "id": "event", "name": "Event", "category": "fate", "costs": [10, 7, 9] },
+    { "id": "createOrder", "name": "Create Order", "category": "orders", "costs": [8, 6, 4] },
+    { "id": "commandOrder", "name": "Command Order", "category": "orders", "costs": [4, 3, 2] },
+    { "id": "createAvatar", "name": "Create Avatar", "category": "avatars", "costs": [10, 7, 8] },
+    { "id": "commandAvatar", "name": "Command Avatar", "category": "avatars", "costs": [2, 1, 1] },
+    {
+      "id": "catastrophe",
+      "name": "Catastrophe",
+      "category": "fate",
+      "costs": [10, 10, 10],
+      "perArea": true
+    }
+  ]
+}
