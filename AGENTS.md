@@ -46,3 +46,5 @@ Docs: https://docs.expo.dev/eas/index.md
 - Default rules are the original Dawn of Worlds (Pesall, 2005). Rule logic lives in `src/rules/` as pure TypeScript with no React or Expo imports, driven by ruleset JSON, and must be unit tested.
 - Phones and tablets are both first-class: use `useLayoutMode()` / `SplitView` for tablet layouts.
 - `npm run check` (typecheck, lint, format, tests) must pass before a task is done.
+- Never put test files under `src/app/`: every file there becomes a route. Put screen tests in `src/__tests__/`.
+- Database changes go in a new file in `supabase/migrations/` with RLS enabled, plus checks in `supabase/tests/rls_test.sql`. Run `./scripts/test-db.sh`.
