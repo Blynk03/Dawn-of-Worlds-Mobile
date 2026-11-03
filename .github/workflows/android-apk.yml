@@ -1,0 +1,84 @@
+name: Build Android app
+
+# Builds an installable Android app (APK) and attaches it to the "android-latest" GitHub Release:
+#   https://github.com/Blynk03/Dawn-of-Worlds-Mobile/releases/download/android-latest/dawn-of-worlds.apk
+# For friends' phones and tablets ("install unknown apps"). Store builds come later with EAS (DOW-17).
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ['**.md', 'docs/**', 'supabase/**']
+  pull_request: # build only (download from the run's artifacts), when the native setup changes
+    paths:
+      - package.json
+      - package-lock.json
+      - app.json
+      - app.config.js
+      - .github/workflows/android-apk.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Publishable values only (see deploy-web.yml).
+  EXPO_PUBLIC_SUPABASE_URL: https://ypbvbyijrpiqwfymqnpb.supabase.co
+  EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_uDC1aI-3P3YwUPbjW9fZWg_tPh7MEXQ
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+      - run: npm ci
+
+      # Generate the native Android project from app.json (it isn't committed; see AGENTS.md).
+      # The build number increases every run so each new APK installs over the previous one.
+      - run: npx expo prebuild --platform android --no-install
+        env:
+          ANDROID_VERSION_CODE: ${{ github.run_number }}
+
+      # Release build. Expo's template signs release builds with its bundled debug key, which is
+      # fine for sharing with friends; Play Store builds will use a real key via EAS (DOW-17).
+      - name: Build APK
+        working-directory: android
+        run: >
+          ./gradlew assembleRelease --no-daemon
+          -PreactNativeArchitectures=arm64-v8a,armeabi-v7a
+
+      - name: Collect APK
+        run: |
+          apk=$(find android/app/build/outputs/apk/release -name '*.apk' | head -n 1)
+          cp "$apk" dawn-of-worlds.apk
+          ls -lh dawn-of-worlds.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dawn-of-worlds-apk
+          path: dawn-of-worlds.apk
+
+      - name: Publish to the android-latest release
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete android-latest --yes --cleanup-tag || true
+          gh release create android-latest dawn-of-worlds.apk \
+            --title "Android app (latest)" \
+            --notes "Latest Android build from main ($(git rev-parse --short HEAD)), built $(date -u +'%Y-%m-%d %H:%M UTC'). Install instructions: docs/install.md" \
+            --target "$GITHUB_SHA" \
+            --prerelease

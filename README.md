@@ -4,6 +4,15 @@ A mobile app for playing Dawn of Worlds, the collaborative world-building game, 
 
 Planning lives in Jira (project **DOW**). Stories are grouped into the **MVP**, **v2** and **v3** releases. Labels say who should pick them up: `claude-ready`, `human`, or `either`.
 
+## Try it
+
+No setup needed. See **[docs/install.md](docs/install.md)**:
+
+- **Web app** (iPad, iPhone, any browser): https://blynk03.github.io/Dawn-of-Worlds-Mobile/
+- **Android app (APK)**: https://github.com/Blynk03/Dawn-of-Worlds-Mobile/releases/download/android-latest/dawn-of-worlds.apk
+
+Both are rebuilt automatically every time something is merged into `main`.
+
 ## Stack
 
 - [Expo](https://expo.dev) SDK 58 / React Native, [Expo Router](https://docs.expo.dev/router/introduction/) for navigation
