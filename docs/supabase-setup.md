@@ -18,10 +18,11 @@ Run each new file in `supabase/migrations/` once, in filename order.
 Go to **Authentication → URL Configuration**:
 
 - **Site URL:** `dawnofworlds://`
-- **Redirect URLs:** add all three of these:
+- **Redirect URLs:** add all four of these:
   - `dawnofworlds://**`: the installed app (development and store builds)
   - `exp://**`: Expo Go during development
   - `http://localhost:8081/**`: the web version during development
+  - `https://blynk03.github.io/Dawn-of-Worlds-Mobile/**`: the published web app (see [install.md](install.md))
 
 Without these, the email link opens Supabase's site instead of the app.
 

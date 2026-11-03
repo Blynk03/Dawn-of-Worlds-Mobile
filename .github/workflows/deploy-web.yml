@@ -1,0 +1,55 @@
+name: Deploy web app
+
+# Builds the web version and publishes it to GitHub Pages:
+#   https://blynk03.github.io/Dawn-of-Worlds-Mobile/
+# Works on iPad, iPhone, Android and computers; "Add to Home Screen" makes it open like an app.
+# One-time setup: repo Settings → Pages → Source: "GitHub Actions".
+
+on:
+  push:
+    branches: [main]
+  pull_request: # build only, to catch problems before merging
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  EXPO_PUBLIC_BASE_URL: /Dawn-of-Worlds-Mobile
+  # Publishable values only. They end up in the public web bundle anyway, and Supabase's
+  # row-level security is what protects the data. Never put the secret/service_role key here.
+  EXPO_PUBLIC_SUPABASE_URL: https://ypbvbyijrpiqwfymqnpb.supabase.co
+  EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_uDC1aI-3P3YwUPbjW9fZWg_tPh7MEXQ
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx expo export --platform web --output-dir dist
+      - run: node scripts/prepare-web-deploy.mjs dist
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

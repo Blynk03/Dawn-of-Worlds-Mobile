@@ -1,9 +1,9 @@
-import * as Linking from 'expo-linking';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, StyleSheet } from 'react-native';
 
 import { useAuth } from '@/auth/auth-provider';
 import { looksLikeEmail, looksLikeEmailCode } from '@/auth/email';
+import { authRedirectUrl } from '@/auth/redirect-url';
 import { Button, TextField } from '@/components/form';
 import { PlaceholderScreen } from '@/components/placeholder-screen';
 import { ThemedText } from '@/components/themed-text';
@@ -26,7 +26,7 @@ export default function SignInScreen() {
     clearLinkError();
     const { error: sendError } = await supabase.auth.signInWithOtp({
       email: address,
-      options: { emailRedirectTo: Linking.createURL('/auth/callback') },
+      options: { emailRedirectTo: authRedirectUrl() },
     });
     setBusy(false);
     if (sendError) {
