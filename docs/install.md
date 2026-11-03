@@ -30,6 +30,8 @@ Open **https://blynk03.github.io/Dawn-of-Worlds-Mobile/** in a browser.
 
 - **No email?** Check spam and mark it "Not spam". Codes expire after a while, so request a new one if it's old.
 - **"Email link is invalid or has expired"**: request a new code from the sign-in screen.
+- **Android won't install, or nothing happens when you tap the file:** on Samsung devices, turn off **Settings → Security and privacy → Auto Blocker** while installing (turn it back on after). You may also need to pause **Play Protect** (Play Store → profile → Play Protect → ⚙️).
+- **Download stuck at 100% (about 54 MB) and the file never appears in Files:** the browser isn't finishing the download. Easiest fix: get the file from someone who already has it. On their device, open **Files → Downloads**, long-press `dawn-of-worlds.apk`, tap **Share → Quick Share**, and send it to you. Other things to try: in Chrome, **Settings → Privacy and security → Safe Browsing → Standard protection**, then download again, or use a different browser. Or just use the web app above.
 - **Android says "App not installed"** when updating: uninstall the old version first, then install the new one.
 
 ---
