@@ -26,3 +26,11 @@ as $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$
 grant usage on schema public to anon, authenticated;
 alter default privileges in schema public grant all on tables to anon, authenticated;
 alter default privileges in schema public grant all on functions to anon, authenticated;
+
+-- Supabase creates this publication for Realtime.
+do $$
+begin
+  if not exists (select 1 from pg_publication where pubname = 'supabase_realtime') then
+    create publication supabase_realtime;
+  end if;
+end $$;

@@ -38,6 +38,7 @@ export type Database = {
           name: string;
           ruleset_id: string;
           status: 'lobby' | 'active' | 'finished';
+          invite_code: string;
           created_by: string;
           created_at: string;
           updated_at: string;
@@ -47,6 +48,7 @@ export type Database = {
           name: string;
           ruleset_id?: string;
           status?: 'lobby' | 'active' | 'finished';
+          invite_code?: string;
           created_by?: string;
           created_at?: string;
           updated_at?: string;
@@ -103,12 +105,59 @@ export type Database = {
           },
         ];
       };
+      gods: {
+        Row: {
+          id: string;
+          world_id: string;
+          user_id: string;
+          name: string;
+          spheres: string[];
+          personality: string;
+          color: string;
+          sigil: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          world_id: string;
+          user_id?: string;
+          name: string;
+          spheres: string[];
+          personality?: string;
+          color: string;
+          sigil: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          name?: string;
+          spheres?: string[];
+          personality?: string;
+          color?: string;
+          sigil?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'gods_world_id_fkey';
+            columns: ['world_id'];
+            isOneToOne: false;
+            referencedRelation: 'worlds';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
     };
     Views: { [_ in never]: never };
     Functions: {
       is_world_member: { Args: { target_world: string }; Returns: boolean };
       is_world_host: { Args: { target_world: string }; Returns: boolean };
       shares_world_with: { Args: { other_user: string }; Returns: boolean };
+      join_world: { Args: { code: string }; Returns: string };
+      start_world: { Args: { target_world: string }; Returns: undefined };
+      set_my_gm_role: { Args: { target_world: string; gm: boolean }; Returns: undefined };
+      generate_invite_code: { Args: Record<PropertyKey, never>; Returns: string };
     };
     Enums: { [_ in never]: never };
     CompositeTypes: { [_ in never]: never };
@@ -118,3 +167,4 @@ export type Database = {
 export type Profile = Database['public']['Tables']['profiles']['Row'];
 export type World = Database['public']['Tables']['worlds']['Row'];
 export type WorldMember = Database['public']['Tables']['world_members']['Row'];
+export type God = Database['public']['Tables']['gods']['Row'];

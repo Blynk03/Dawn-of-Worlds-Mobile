@@ -33,13 +33,14 @@ function RootNavigator() {
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Protected guard={signedIn}>
-        <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="(app)" />
       </Stack.Protected>
       <Stack.Protected guard={!signedIn}>
         <Stack.Screen name="sign-in" />
       </Stack.Protected>
-      {/* Magic links land here whether or not the user is signed in yet. */}
+      {/* Magic links and invite links work whether or not the user is signed in yet. */}
       <Stack.Screen name="auth/callback" />
+      <Stack.Screen name="join/[code]" />
     </Stack>
   );
 }

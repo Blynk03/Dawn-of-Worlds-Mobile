@@ -62,7 +62,8 @@
       "/.expo/"
     ],
     "moduleNameMapper": {
-      "\\.css$": "<rootDir>/test/style-mock.js"
+      "\\.css$": "<rootDir>/test/style-mock.js",
+      "^expo-sqlite/localStorage/install$": "<rootDir>/test/noop.js"
     }
   }
 }

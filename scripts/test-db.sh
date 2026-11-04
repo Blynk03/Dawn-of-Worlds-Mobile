@@ -19,4 +19,7 @@ for migration in "$ROOT"/supabase/migrations/*.sql; do
   echo "Applying $(basename "$migration")"
   psql -q -v ON_ERROR_STOP=1 -d "$DB" -f "$migration"
 done
-psql -q -v ON_ERROR_STOP=1 -d "$DB" -f "$ROOT/supabase/tests/rls_test.sql"
+for test in "$ROOT"/supabase/tests/*_test.sql; do
+  echo "Running $(basename "$test")"
+  psql -q -v ON_ERROR_STOP=1 -d "$DB" -f "$test"
+done
