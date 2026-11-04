@@ -34,3 +34,7 @@ begin
     create publication supabase_realtime;
   end if;
 end $$;
+
+-- Supabase installs extensions such as pgcrypto into the "extensions" schema.
+create schema if not exists extensions;
+grant usage on schema extensions to anon, authenticated;

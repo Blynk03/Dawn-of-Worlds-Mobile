@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native';
+import { Pressable, type StyleProp, StyleSheet, Text, View, type ViewStyle } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -36,7 +36,7 @@ export function GodBadge({
   );
 }
 
-export function Card({ children, style }: { children: ReactNode; style?: ViewStyle }) {
+export function Card({ children, style }: { children: ReactNode; style?: StyleProp<ViewStyle> }) {
   return (
     <ThemedView type="backgroundElement" style={[styles.card, style]}>
       {children}

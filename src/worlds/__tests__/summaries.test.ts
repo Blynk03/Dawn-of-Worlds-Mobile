@@ -54,6 +54,36 @@ describe('worldAction', () => {
   });
 });
 
+describe('your turn', () => {
+  const active = (activeGodOwner: string) => ({
+    status: 'active' as const,
+    updated_at: '2026-11-01T00:00:00Z',
+    world_members: [member(me), member('bob')],
+    gods: [
+      { id: 'g-me', user_id: me },
+      { id: 'g-bob', user_id: 'bob' },
+    ],
+    world_state: {
+      round: 3,
+      turn_order: activeGodOwner === me ? ['g-me', 'g-bob'] : ['g-bob', 'g-me'],
+      active_position: 1,
+    },
+  });
+
+  it('detects when the active god is yours', () => {
+    expect(worldAction(active(me), me)).toBe('yourTurn');
+    expect(worldAction(active('bob'), me)).toBe('playing');
+    expect(worldStatusLabel(active(me), me)).toBe('Your turn · Round 3');
+    expect(worldStatusLabel(active('bob'), me)).toBe('In play · Round 3 · 2 players');
+  });
+
+  it('puts your turn above everything else', () => {
+    const needGod = { ...world('lobby', [member(me)], [], '2026-11-09T00:00:00Z'), id: 'god' };
+    const mine = { ...active(me), id: 'turn' };
+    expect(sortWorldsForHome([needGod, mine], me).map((w) => w.id)).toEqual(['turn', 'god']);
+  });
+});
+
 describe('sortWorldsForHome', () => {
   it('puts worlds that need you first, newest first within a group', () => {
     const waiting = {

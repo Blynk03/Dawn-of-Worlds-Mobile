@@ -2,13 +2,16 @@
 import type { God, World, WorldMember } from '@/lib/database.types';
 
 type MemberLike = Pick<WorldMember, 'user_id' | 'role' | 'is_gm'>;
-type GodLike = Pick<God, 'user_id'>;
+type GodLike = Pick<God, 'user_id'> & Partial<Pick<God, 'id'>>;
+type StateLike = { round: number; turn_order: string[]; active_position: number };
 type WorldLike = Pick<World, 'status' | 'updated_at'> & {
   world_members: MemberLike[];
   gods: GodLike[];
+  world_state?: StateLike | null;
 };
 
 export type WorldAction =
+  | 'yourTurn' // a game in play is waiting on you
   | 'createGod' // you still need a god
   | 'startGame' // you're the host and everyone is ready
   | 'waitingForPlayers' // lobby, nothing for you to do
@@ -29,7 +32,7 @@ export function canStart(members: MemberLike[], gods: GodLike[]): boolean {
 /** What this world needs from the signed-in player right now. */
 export function worldAction(world: WorldLike, myUserId: string): WorldAction {
   if (world.status === 'finished') return 'finished';
-  if (world.status === 'active') return 'playing';
+  if (world.status === 'active') return isMyTurn(world, myUserId) ? 'yourTurn' : 'playing';
   const me = world.world_members.find((m) => m.user_id === myUserId);
   const hasGod = world.gods.some((g) => g.user_id === myUserId);
   if (me && !me.is_gm && !hasGod) return 'createGod';
@@ -37,16 +40,25 @@ export function worldAction(world: WorldLike, myUserId: string): WorldAction {
   return 'waitingForPlayers';
 }
 
+/** Whether the god whose turn it is belongs to this player. */
+export function isMyTurn(world: WorldLike, myUserId: string): boolean {
+  const state = world.world_state;
+  if (!state) return false;
+  const activeGod = state.turn_order[state.active_position - 1];
+  return world.gods.some((g) => g.id === activeGod && g.user_id === myUserId);
+}
+
 const ACTION_ORDER: Record<WorldAction, number> = {
-  createGod: 0,
-  startGame: 1,
-  playing: 2,
-  waitingForPlayers: 3,
-  finished: 4,
+  yourTurn: 0,
+  createGod: 1,
+  startGame: 2,
+  playing: 3,
+  waitingForPlayers: 4,
+  finished: 5,
 };
 
 /**
- * Worlds that need you come first ("Your turn" joins this once turns exist, DOW-25), then
+ * Worlds that need you come first (your turn, then setup tasks), then
  * active games, then lobbies you're waiting on, then finished worlds. Most recent first within each.
  */
 export function sortWorldsForHome<W extends WorldLike>(worlds: W[], myUserId: string): W[] {
@@ -60,7 +72,10 @@ export function sortWorldsForHome<W extends WorldLike>(worlds: W[], myUserId: st
 export function worldStatusLabel(world: WorldLike, myUserId: string): string {
   const players = world.world_members.length;
   const playerText = `${players} ${players === 1 ? 'player' : 'players'}`;
+  const round = world.world_state?.round;
   switch (worldAction(world, myUserId)) {
+    case 'yourTurn':
+      return round ? `Your turn · Round ${round}` : 'Your turn';
     case 'createGod':
       return `Lobby · ${playerText} · Create your god`;
     case 'startGame':
@@ -68,7 +83,7 @@ export function worldStatusLabel(world: WorldLike, myUserId: string): string {
     case 'waitingForPlayers':
       return `Lobby · ${playerText} · Waiting for players`;
     case 'playing':
-      return `In play · ${playerText}`;
+      return round ? `In play · Round ${round} · ${playerText}` : `In play · ${playerText}`;
     case 'finished':
       return `Finished · ${playerText}`;
   }

@@ -34,6 +34,12 @@ jest.mock('@/worlds/invite', () => ({
   savePendingInvite: jest.fn(),
 }));
 jest.mock('@/worlds/share', () => ({ shareInvite: jest.fn(() => Promise.resolve('shared')) }));
+jest.mock('@/components/game-panel', () => ({
+  GamePanel: () => {
+    const { View } = jest.requireActual('react-native');
+    return <View testID="game-panel" />;
+  },
+}));
 
 const mockApi = jest.mocked(api);
 
@@ -43,6 +49,7 @@ const world = (overrides: Partial<World> = {}): World => ({
   ruleset_id: 'classic',
   status: 'lobby',
   invite_code: 'ABC234',
+  turn_time_limit_hours: null,
   created_by: 'me',
   created_at: '2026-11-03T00:00:00Z',
   updated_at: '2026-11-03T00:00:00Z',
@@ -84,11 +91,13 @@ describe('Worlds home (DOW-24)', () => {
         ...world({ id: 'a', name: 'Waiting World', updated_at: '2026-11-03T05:00:00Z' }),
         world_members: [{ user_id: 'me', role: 'player', is_gm: false }],
         gods: [{ id: 'g1', user_id: 'me', name: 'Solara', color: '#E3B05B', sigil: '☀' }],
+        world_state: null,
       },
       {
         ...world({ id: 'b', name: 'Needs God' }),
         world_members: [{ user_id: 'me', role: 'player', is_gm: false }],
         gods: [],
+        world_state: null,
       },
     ]);
     await render(<WorldsScreen />);
@@ -143,8 +152,9 @@ describe('New world (DOW-22)', () => {
     expect(screen.getByRole('button', { name: 'Create world' })).toBeDisabled();
     await fireEvent.changeText(screen.getByLabelText('World name'), 'Aerth');
     await fireEvent(screen.getByLabelText("I'm the game master"), 'valueChange', true);
+    await fireEvent.press(screen.getByLabelText('24 hours'));
     await fireEvent.press(screen.getByRole('button', { name: 'Create world' }));
-    expect(mockApi.createWorld).toHaveBeenCalledWith('Aerth', true);
+    expect(mockApi.createWorld).toHaveBeenCalledWith('Aerth', true, 24);
     expect(mockRouter.replace).toHaveBeenCalledWith('/world/new1');
   });
 });
@@ -209,6 +219,25 @@ describe('World lobby (DOW-22)', () => {
     expect(await screen.findByRole('button', { name: 'Create your god' })).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Start the First Age' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Remove' })).toBeNull();
+  });
+});
+
+describe('World screen once the game has started', () => {
+  it('shows the game instead of the lobby', async () => {
+    mockParams = { id: 'w1' };
+    mockApi.getLobby.mockResolvedValue({
+      world: world({ status: 'active' }),
+      members: [member('me', 'host'), member('bob')],
+      gods: [
+        god({ user_id: 'me' }),
+        god({ id: 'g2', user_id: 'bob', name: 'Umbra', color: '#2563EB' }),
+      ],
+    });
+    await render(<WorldScreen />);
+    expect(await screen.findByTestId('game-panel')).toBeTruthy();
+    expect(screen.queryByText(/Players \(/)).toBeNull();
+    expect(screen.queryByText('Invite friends')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Start the First Age' })).toBeNull();
   });
 });
 
