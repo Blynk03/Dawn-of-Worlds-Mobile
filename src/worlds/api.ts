@@ -117,32 +117,44 @@ export async function updateGod(godId: string, fields: Partial<GodFields>): Prom
   return checkRow(await client().from('gods').update(update).eq('id', godId).select('*').single());
 }
 
+let channelCounter = 0;
+
 /**
  * Calls `onChange` when anything about the world, its members or its gods changes, so lobbies
  * update live when friends join or pick their gods. Returns an unsubscribe function.
+ *
+ * Each subscription gets its own channel name: Supabase returns the *existing* channel for a
+ * name that's already in use, and adding listeners to a channel that's already subscribed throws
+ * (this crashed the app when the god editor opened on top of the lobby). Live updates are a
+ * nice-to-have, so any failure here is logged rather than thrown.
  */
 export function subscribeToWorld(worldId: string, onChange: () => void): () => void {
   if (!supabase) return () => {};
   const db = supabase;
-  const channel = db
-    .channel(`world:${worldId}`)
-    .on(
-      'postgres_changes',
-      { event: '*', schema: 'public', table: 'worlds', filter: `id=eq.${worldId}` },
-      onChange,
-    )
-    .on(
-      'postgres_changes',
-      { event: '*', schema: 'public', table: 'world_members', filter: `world_id=eq.${worldId}` },
-      onChange,
-    )
-    .on(
-      'postgres_changes',
-      { event: '*', schema: 'public', table: 'gods', filter: `world_id=eq.${worldId}` },
-      onChange,
-    )
-    .subscribe();
-  return () => {
-    db.removeChannel(channel);
-  };
+  try {
+    const channel = db
+      .channel(`world:${worldId}:${++channelCounter}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'worlds', filter: `id=eq.${worldId}` },
+        onChange,
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'world_members', filter: `world_id=eq.${worldId}` },
+        onChange,
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'gods', filter: `world_id=eq.${worldId}` },
+        onChange,
+      )
+      .subscribe();
+    return () => {
+      db.removeChannel(channel);
+    };
+  } catch (error) {
+    console.warn('Live updates unavailable for this world:', error);
+    return () => {};
+  }
 }
