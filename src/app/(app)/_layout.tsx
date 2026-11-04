@@ -1,6 +1,10 @@
 import { Stack } from 'expo-router';
 
+import { ScreenError } from '@/components/screen-error';
 import { useTheme } from '@/hooks/use-theme';
+
+// Any error in a signed-in screen shows a recovery screen instead of crashing the app.
+export const ErrorBoundary = ScreenError;
 
 /** Everything a signed-in player sees: the tabs, plus world screens pushed on top of them. */
 export default function AppLayout() {
