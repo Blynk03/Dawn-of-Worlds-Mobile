@@ -78,7 +78,7 @@ function WorldCard({
   onPress: () => void;
 }) {
   const myGod = world.gods.find((g) => g.user_id === myId);
-  const needsYou = ['createGod', 'startGame'].includes(worldAction(world, myId));
+  const needsYou = ['yourTurn', 'createGod', 'startGame'].includes(worldAction(world, myId));
   return (
     <Pressable
       accessibilityRole="button"

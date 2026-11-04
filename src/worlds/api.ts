@@ -2,7 +2,7 @@
  * Supabase calls for worlds, membership and gods. Row-level security (supabase/migrations) decides
  * what each player can see and change; these functions just shape the requests and results.
  */
-import type { God, World, WorldMember } from '@/lib/database.types';
+import type { God, World, WorldMember, WorldState } from '@/lib/database.types';
 import { supabase } from '@/lib/supabase';
 
 import { friendlyError } from './errors';
@@ -33,6 +33,7 @@ export type GodSummary = Pick<God, 'id' | 'user_id' | 'name' | 'color' | 'sigil'
 export type WorldSummary = World & {
   world_members: Pick<WorldMember, 'user_id' | 'role' | 'is_gm'>[];
   gods: GodSummary[];
+  world_state: Pick<WorldState, 'round' | 'turn_order' | 'active_position'> | null;
 };
 
 /** Every world the signed-in player belongs to. */
@@ -40,7 +41,9 @@ export async function listMyWorlds(): Promise<WorldSummary[]> {
   const data = check(
     await client()
       .from('worlds')
-      .select('*, world_members(user_id, role, is_gm), gods(id, user_id, name, color, sigil)')
+      .select(
+        '*, world_members(user_id, role, is_gm), gods(id, user_id, name, color, sigil), world_state(round, turn_order, active_position)',
+      )
       .order('updated_at', { ascending: false }),
   );
   return (data ?? []) as unknown as WorldSummary[];
@@ -74,10 +77,18 @@ export async function getLobby(worldId: string): Promise<Lobby | null> {
   };
 }
 
-export async function createWorld(name: string, hostIsGm: boolean): Promise<World> {
+export async function createWorld(
+  name: string,
+  hostIsGm: boolean,
+  turnTimeLimitHours: number | null = null,
+): Promise<World> {
   const db = client();
   const world = checkRow(
-    await db.from('worlds').insert({ name: name.trim() }).select('*').single(),
+    await db
+      .from('worlds')
+      .insert({ name: name.trim(), turn_time_limit_hours: turnTimeLimitHours })
+      .select('*')
+      .single(),
   );
   if (hostIsGm) {
     check(await db.rpc('set_my_gm_role', { target_world: world.id, gm: true }));

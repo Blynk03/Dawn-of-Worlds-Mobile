@@ -4,6 +4,7 @@ import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, View } from 
 
 import { useAuth } from '@/auth/auth-provider';
 import { Button } from '@/components/form';
+import { GamePanel } from '@/components/game-panel';
 import { Card, ErrorMessage, GodBadge, SectionLabel } from '@/components/game-ui';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -94,16 +95,11 @@ export default function WorldScreen() {
             {shareNote ? <ThemedText type="small">{shareNote}</ThemedText> : null}
           </Card>
         ) : (
-          <Card>
-            <ThemedText type="smallBold">The First Age has begun</ThemedText>
-            <ThemedText type="small" themeColor="textSecondary">
-              Taking turns and shaping the map are coming next (DOW-25, DOW-31).
-            </ThemedText>
-          </Card>
+          <GamePanel worldId={world.id} gods={gods} members={members} myId={myId} />
         )}
 
-        <SectionLabel>Players ({members.length}/8)</SectionLabel>
-        {members.map((member) => (
+        {inLobby ? <SectionLabel>Players ({members.length}/8)</SectionLabel> : null}
+        {(inLobby ? members : []).map((member) => (
           <MemberRow
             key={member.user_id}
             member={member}

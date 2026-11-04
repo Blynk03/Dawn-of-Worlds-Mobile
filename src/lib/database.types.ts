@@ -39,6 +39,7 @@ export type Database = {
           ruleset_id: string;
           status: 'lobby' | 'active' | 'finished';
           invite_code: string;
+          turn_time_limit_hours: number | null;
           created_by: string;
           created_at: string;
           updated_at: string;
@@ -49,15 +50,14 @@ export type Database = {
           ruleset_id?: string;
           status?: 'lobby' | 'active' | 'finished';
           invite_code?: string;
+          turn_time_limit_hours?: number | null;
           created_by?: string;
           created_at?: string;
           updated_at?: string;
         };
         Update: {
           name?: string;
-          ruleset_id?: string;
-          status?: 'lobby' | 'active' | 'finished';
-          updated_at?: string;
+          turn_time_limit_hours?: number | null;
         };
         Relationships: [
           {
@@ -148,6 +148,57 @@ export type Database = {
           },
         ];
       };
+      world_state: {
+        Row: {
+          world_id: string;
+          age: number;
+          round: number;
+          year: number;
+          turn_order: string[];
+          active_position: number;
+          turn_started_at: string | null;
+          turn_deadline: string | null;
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [
+          {
+            foreignKeyName: 'world_state_world_id_fkey';
+            columns: ['world_id'];
+            isOneToOne: true;
+            referencedRelation: 'worlds';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      god_power: {
+        Row: { god_id: string; world_id: string; power: number; low_pool_bonus: number };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      world_events: {
+        Row: {
+          id: number;
+          world_id: string;
+          seq: number;
+          age: number;
+          round: number;
+          god_id: string | null;
+          type: string;
+          payload: Json;
+          created_at: string;
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      rulesets: {
+        Row: { id: string; config: Json };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
     };
     Views: { [_ in never]: never };
     Functions: {
@@ -158,6 +209,8 @@ export type Database = {
       start_world: { Args: { target_world: string }; Returns: undefined };
       set_my_gm_role: { Args: { target_world: string; gm: boolean }; Returns: undefined };
       generate_invite_code: { Args: Record<PropertyKey, never>; Returns: string };
+      end_turn: { Args: { target_world: string; pass?: boolean }; Returns: undefined };
+      skip_timed_out_turn: { Args: { target_world: string }; Returns: undefined };
     };
     Enums: { [_ in never]: never };
     CompositeTypes: { [_ in never]: never };
@@ -168,3 +221,5 @@ export type Profile = Database['public']['Tables']['profiles']['Row'];
 export type World = Database['public']['Tables']['worlds']['Row'];
 export type WorldMember = Database['public']['Tables']['world_members']['Row'];
 export type God = Database['public']['Tables']['gods']['Row'];
+export type WorldState = Database['public']['Tables']['world_state']['Row'];
+export type WorldEventRow = Database['public']['Tables']['world_events']['Row'];
