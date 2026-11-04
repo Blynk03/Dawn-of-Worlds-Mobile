@@ -48,3 +48,5 @@ Docs: https://docs.expo.dev/eas/index.md
 - `npm run check` (typecheck, lint, format, tests) must pass before a task is done.
 - Never put test files under `src/app/`: every file there becomes a route. Put screen tests in `src/__tests__/`.
 - Database changes go in a new file in `supabase/migrations/` with RLS enabled, plus checks in `supabase/tests/rls_test.sql`. Run `./scripts/test-db.sh`.
+- Signed-in screens live under `src/app/(app)/` (protected by the root layout). Public routes (`sign-in`, `auth/callback`, `join/[code]`) live at the top level.
+- Supabase calls go through `src/worlds/api.ts`-style modules that throw player-friendly errors (`friendlyError`); keep screens free of raw Supabase queries.
