@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 
 import { Button } from '@/components/form';
@@ -14,6 +14,7 @@ import type { God } from '@/lib/database.types';
 import { useLayoutMode } from '@/hooks/use-layout-mode';
 import { SIDE_PANEL_WIDTH } from '@/layout/breakpoints';
 import { type Hex, hexIndex } from '@/map/hex';
+import { mapMarkers } from '@/map/markers';
 import type { LobbyMember } from '@/worlds/api';
 
 type Props = { worldId: string; gods: God[]; members: LobbyMember[]; myId: string };
@@ -29,12 +30,14 @@ export function ActiveWorld({ worldId, gods, members, myId }: Props) {
   const [inspected, setInspected] = useState<Hex | null>(null);
   const map = game.view.map;
   const myGod = gods.find((g) => g.user_id === myId);
+  const markers = useMemo(() => mapMarkers(game.view, gods), [game.view, gods]);
 
   const mapArea = (
     <View style={styles.fill}>
       {map ? (
         <HexMap
           map={map}
+          markers={markers}
           focused={inspected ? hexIndex(inspected, map.width) : null}
           onTapHex={setInspected}
           onLongPressHex={setInspected}
@@ -69,6 +72,11 @@ export function ActiveWorld({ worldId, gods, members, myId }: Props) {
         myId={myId}
         game={game}
         onAct={map ? () => router.push(`/world/${worldId}/act`) : undefined}
+      />
+      <Button
+        title={`Atlas · ${game.view.races.length} ${game.view.races.length === 1 ? 'race' : 'races'}, ${game.view.cities.length} ${game.view.cities.length === 1 ? 'city' : 'cities'}`}
+        variant="secondary"
+        onPress={() => router.push(`/world/${worldId}/atlas`)}
       />
       {myGod ? (
         <Button

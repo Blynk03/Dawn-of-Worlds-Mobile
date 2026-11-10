@@ -54,6 +54,7 @@
       "tundra",
       "swamp"
     ],
+    "water": ["ocean", "lake"],
     "climates": ["none", "fog", "rain", "snow", "sun", "heat", "cold", "sleet"]
   },
   "powers": [

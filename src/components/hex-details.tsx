@@ -4,7 +4,14 @@ import { Button } from '@/components/form';
 import { Card, GodBadge } from '@/components/game-ui';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
-import { ageName, type GameView, hexChanges, type WorldMapView } from '@/game/project';
+import {
+  type ActionRecord,
+  ageName,
+  type GameView,
+  hexChanges,
+  settlementsAt,
+  type WorldMapView,
+} from '@/game/project';
 import type { God } from '@/lib/database.types';
 import { type Hex, hexIndex } from '@/map/hex';
 import { climateInfo, terrainInfo } from '@/map/terrain';
@@ -12,7 +19,25 @@ import { climateInfo, terrainInfo } from '@/map/terrain';
 const POWER_NAMES: Record<string, string> = {
   shapeLand: 'Shape Land',
   shapeClimate: 'Shape Climate',
+  createRace: 'Create Race',
+  commandRace: 'Command Race',
 };
+
+/** e.g. "Shape Land: Hills", "Create Race: Dwarves", "Command Race: founded Karak". */
+function describeChange(change: ActionRecord): string {
+  const power = POWER_NAMES[change.power] ?? change.power;
+  const what =
+    change.power === 'shapeLand'
+      ? terrainInfo(change.choice).name
+      : change.power === 'shapeClimate'
+        ? climateInfo(change.choice).name
+        : change.intent === 'foundCity'
+          ? `founded ${change.choice}`
+          : change.choice;
+  return `${power}: ${what}`;
+}
+
+const ALIGNMENT = (n: number) => (n > 0 ? 'good' : n < 0 ? 'evil' : 'neutral');
 
 /** DOW-33: what a hex is now, and every change gods have made to it. */
 export function HexDetails({
@@ -33,6 +58,8 @@ export function HexDetails({
   const climate =
     map.climate[index] && map.climate[index] !== 'none' ? climateInfo(map.climate[index]) : null;
   const changes = view ? hexChanges(view, index) : [];
+  const { race, city } = view ? settlementsAt(view, hex) : { race: null, city: null };
+  const cityRace = city && view ? view.races.find((r) => r.id === city.raceId) : null;
 
   return (
     <Card style={styles.card}>
@@ -48,6 +75,18 @@ export function HexDetails({
         </View>
         <Button title="Close" variant="secondary" onPress={onClose} />
       </View>
+      {race ? (
+        <ThemedText type="small">
+          <ThemedText type="smallBold">Homeland of the {race.name}</ThemedText>
+          {` · ${ALIGNMENT(race.alignment)}`}
+        </ThemedText>
+      ) : null}
+      {city ? (
+        <ThemedText type="small">
+          <ThemedText type="smallBold">City of {city.name}</ThemedText>
+          {cityRace ? ` · built by the ${cityRace.name}` : ''}
+        </ThemedText>
+      ) : null}
       {changes.length === 0 ? (
         <ThemedText type="small" themeColor="textSecondary">
           Untouched since the dawn of the world.
@@ -55,12 +94,6 @@ export function HexDetails({
       ) : (
         changes.map((change) => {
           const god = gods.find((g) => g.id === change.godId);
-          const what =
-            change.power === 'shapeLand'
-              ? terrainInfo(change.choice).name
-              : change.power === 'shapeClimate'
-                ? climateInfo(change.choice).name
-                : change.choice;
           return (
             <View key={change.seq} style={styles.change}>
               <GodBadge
@@ -72,7 +105,7 @@ export function HexDetails({
               <View style={styles.changeText}>
                 <ThemedText type="small">
                   <ThemedText type="smallBold">{god?.name ?? 'A god'}</ThemedText>
-                  {` · ${POWER_NAMES[change.power] ?? change.power}: ${what}`}
+                  {` · ${describeChange(change)}`}
                 </ThemedText>
                 <ThemedText type="small" themeColor="textSecondary">
                   “{change.description}” · {ageName(change.age)}, round {change.round}

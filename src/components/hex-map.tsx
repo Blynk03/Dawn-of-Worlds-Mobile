@@ -10,11 +10,14 @@ import {
   useTapGesture,
 } from 'react-native-gesture-handler';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
-import Svg, { G, Polygon, Text as SvgText } from 'react-native-svg';
+import Svg, { Circle, G, Polygon, Rect, Text as SvgText } from 'react-native-svg';
 
 import type { WorldMapView } from '@/game/project';
 import { type Hex, hexAtPoint, hexCenter, hexCorners, hexFromIndex, mapPixelSize } from '@/map/hex';
+import type { MapMarker } from '@/map/markers';
 import { climateInfo, terrainInfo, TERRAINS } from '@/map/terrain';
+
+export type { MapMarker };
 
 /** Hex radius in map pixels at zoom 1. */
 const HEX_SIZE = 20;
@@ -24,6 +27,10 @@ const TAP_SLOP = 10;
 
 type HexMapProps = {
   map: WorldMapView;
+  /** Races and cities to draw on top of the terrain. Memoize it: the layer redraws when it changes. */
+  markers?: readonly MapMarker[];
+  /** Hexes the player may choose right now (e.g. where a city can be founded). */
+  candidates?: ReadonlySet<number>;
   /** Hex indexes to highlight (e.g. the hexes chosen for an action). */
   selected?: ReadonlySet<number>;
   /** Hex indexes to outline more subtly (e.g. the hex whose history is open). */
@@ -37,7 +44,15 @@ type HexMapProps = {
  * hex. The terrain layer only re-renders when the map changes; panning and zooming move it as a
  * whole on the UI thread, so it stays smooth on tablets.
  */
-export function HexMap({ map, selected, focused, onTapHex, onLongPressHex }: HexMapProps) {
+export function HexMap({
+  map,
+  markers,
+  candidates,
+  selected,
+  focused,
+  onTapHex,
+  onLongPressHex,
+}: HexMapProps) {
   const pixels = useMemo(
     () => mapPixelSize(map.width, map.height, HEX_SIZE),
     [map.width, map.height],
@@ -142,8 +157,17 @@ export function HexMap({ map, selected, focused, onTapHex, onLongPressHex }: Hex
           <Animated.View
             style={[styles.layer, { width: pixels.width, height: pixels.height }, transform]}>
             <TerrainLayer map={map} width={pixels.width} height={pixels.height} />
+            {markers && markers.length > 0 ? (
+              <MarkerLayer
+                markers={markers}
+                mapWidth={map.width}
+                width={pixels.width}
+                height={pixels.height}
+              />
+            ) : null}
             <HighlightLayer
               map={map}
+              candidates={candidates}
               selected={selected}
               focused={focused ?? null}
               width={pixels.width}
@@ -223,22 +247,99 @@ const TerrainLayer = memo(function TerrainLayer({
   );
 });
 
+/** DOW-34/35: race homelands (a circle in the creator's color) and cities (a walled square). */
+const MarkerLayer = memo(function MarkerLayer({
+  markers,
+  mapWidth,
+  width,
+  height,
+}: {
+  markers: readonly MapMarker[];
+  mapWidth: number;
+  width: number;
+  height: number;
+}) {
+  return (
+    <Svg width={width} height={height} style={StyleSheet.absoluteFill} pointerEvents="none">
+      {markers.map((m) => {
+        const c = hexCenter(hexFromIndex(m.index, mapWidth), HEX_SIZE);
+        if (m.kind === 'race') {
+          return (
+            <Circle
+              key={`r${m.index}`}
+              cx={c.x - 10}
+              cy={c.y - 8}
+              r={5}
+              fill={m.color}
+              stroke="#FFFFFF"
+              strokeWidth={1.5}
+            />
+          );
+        }
+        return (
+          <G key={`c${m.index}`}>
+            <Rect
+              x={c.x - 6}
+              y={c.y - 8}
+              width={12}
+              height={10}
+              rx={1.5}
+              fill={m.color}
+              stroke="#FFFFFF"
+              strokeWidth={1.5}
+            />
+            <SvgText
+              x={c.x}
+              y={c.y + 12}
+              fontSize={7}
+              fontWeight="bold"
+              textAnchor="middle"
+              fill="#FFFFFF"
+              stroke="rgba(0,0,0,0.6)"
+              strokeWidth={0.5}>
+              {m.label}
+            </SvgText>
+          </G>
+        );
+      })}
+    </Svg>
+  );
+});
+
 function HighlightLayer({
   map,
+  candidates,
   selected,
   focused,
   width,
   height,
 }: {
   map: WorldMapView;
+  candidates?: ReadonlySet<number>;
   selected?: ReadonlySet<number>;
   focused: number | null;
   width: number;
   height: number;
 }) {
-  if ((!selected || selected.size === 0) && focused === null) return null;
+  if (
+    (!selected || selected.size === 0) &&
+    (!candidates || candidates.size === 0) &&
+    focused === null
+  ) {
+    return null;
+  }
   return (
     <Svg width={width} height={height} style={StyleSheet.absoluteFill} pointerEvents="none">
+      {[...(candidates ?? [])].map((index) => (
+        <Polygon
+          key={`c${index}`}
+          points={hexCorners(hexFromIndex(index, map.width), HEX_SIZE)}
+          fill="rgba(227,176,91,0.22)"
+          stroke="#E3B05B"
+          strokeWidth={1.5}
+          strokeDasharray="3 2"
+        />
+      ))}
       {[...(selected ?? [])].map((index) => (
         <Polygon
           key={`s${index}`}

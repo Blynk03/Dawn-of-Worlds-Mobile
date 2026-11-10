@@ -238,6 +238,29 @@ export type Database = {
         };
         Returns: undefined;
       };
+      create_race: {
+        Args: {
+          target_world: string;
+          race_name: string;
+          race_description: string;
+          race_appearance: string;
+          race_alignment: number;
+          hex_x: number;
+          hex_y: number;
+        };
+        Returns: string;
+      };
+      found_city: {
+        Args: {
+          target_world: string;
+          race: string;
+          city_name: string;
+          hex_x: number;
+          hex_y: number;
+          description: string;
+        };
+        Returns: string;
+      };
     };
     Enums: { [_ in never]: never };
     CompositeTypes: { [_ in never]: never };

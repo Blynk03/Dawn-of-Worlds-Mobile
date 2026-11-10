@@ -38,6 +38,19 @@ begin
   reset role;
 end $$;
 
+-- Runs any action call as the active god, after topping up their power.
+create function pg_temp.act_sql(w uuid, stmt text) returns void language plpgsql as $$
+declare g uuid; u uuid;
+begin
+  reset role;
+  select s.turn_order[s.active_position] into g from public.world_state s where s.world_id = w;
+  select user_id into u from public.gods where id = g;
+  update public.god_power set power = power + 30 where god_id = g;
+  perform pg_temp.act_as(u);
+  execute stmt;
+  reset role;
+end $$;
+
 insert into auth.users (id, email) values
   ('00000000-0000-0000-0000-0000000000a1', 'a@example.com'),
   ('00000000-0000-0000-0000-0000000000b2', 'b@example.com'),
@@ -75,6 +88,13 @@ select pg_temp.play('11111111-1111-1111-1111-111111111111', true, false);
 select pg_temp.play('11111111-1111-1111-1111-111111111111', false, true);
 -- Round 2: a forest on the same hex as before, one turn taken, then a timeout.
 select pg_temp.act('11111111-1111-1111-1111-111111111111', 'shapeLand', '[[2,2],[5,5]]', 'forest', 'Old woods spread');
+-- DOW-34/35: a race on (4,4), then a city next to its homeland.
+select pg_temp.act_sql('11111111-1111-1111-1111-111111111111', $q$
+  select public.create_race('11111111-1111-1111-1111-111111111111', 'Dwarves', 'Stout folk of the deep halls',
+    'Short and bearded', 1, 4, 4)$q$);
+select pg_temp.act_sql('11111111-1111-1111-1111-111111111111', $q$
+  select public.found_city('11111111-1111-1111-1111-111111111111',
+    (select id from public.world_entities where name = 'Dwarves'), 'Karak', 5, 4, 'A hall is carved into the hill')$q$);
 select pg_temp.play('11111111-1111-1111-1111-111111111111', false, false);
 reset role;
 update public.world_state set turn_deadline = now() - interval '1 minute'
@@ -95,6 +115,9 @@ select jsonb_pretty(jsonb_build_object(
     where world_id = '11111111-1111-1111-1111-111111111111'),
   'powers', (select jsonb_object_agg(god_id, jsonb_build_object('power', power, 'lowPoolBonus', low_pool_bonus))
     from public.god_power where world_id = '11111111-1111-1111-1111-111111111111'),
+  'entities', (select jsonb_agg(jsonb_build_object('id', id, 'kind', kind, 'name', name, 'race_id', race_id,
+      'god_id', god_id, 'alignment', alignment, 'hex_x', hex_x, 'hex_y', hex_y) order by created_seq, kind desc)
+    from public.world_entities where world_id = '11111111-1111-1111-1111-111111111111'),
   'map', (select jsonb_build_object('width', width, 'height', height, 'terrain', to_jsonb(terrain), 'climate', to_jsonb(climate))
     from public.world_map where world_id = '11111111-1111-1111-1111-111111111111')
 ));

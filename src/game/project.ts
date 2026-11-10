@@ -53,8 +53,41 @@ export type HexChange = {
   description: string;
 };
 
-/** An action a god took (Shape Land, Shape Climate, …). */
-export type ActionRecord = HexChange & { cost: number; hexes: [number, number][] };
+/** An action a god took (Shape Land, Shape Climate, Create Race, …). */
+export type ActionRecord = HexChange & {
+  cost: number;
+  hexes: [number, number][];
+  /** What a command was for, e.g. 'foundCity' for Command Race. */
+  intent: string | null;
+};
+
+/** When and by whom something entered the world. */
+type Origin = { godId: string | null; createdSeq: number; age: number; round: number };
+
+/** DOW-34: a race, set down on its homeland hex. */
+export type RaceView = Origin & {
+  id: string;
+  name: string;
+  description: string;
+  appearance: string;
+  /** +1 good, 0 neutral, -1 evil (purify/corrupt move it later). */
+  alignment: number;
+  hex: { x: number; y: number };
+};
+
+/** DOW-35: a city founded by a race. */
+export type CityView = Origin & {
+  id: string;
+  name: string;
+  raceId: string;
+  alignment: number;
+  hex: { x: number; y: number };
+  /** What happened when it was founded. */
+  description: string;
+};
+
+/** A sect (order) within a race; a race's creator gets one automatically. */
+export type OrderView = Origin & { id: string; name: string; raceId: string };
 
 export type GameView = {
   started: boolean;
@@ -78,6 +111,9 @@ export type GameView = {
   actions: ActionRecord[];
   /** For each hex index, the seqs of actions that changed it (oldest first). */
   hexHistory: Record<number, number[]>;
+  races: RaceView[];
+  cities: CityView[];
+  orders: OrderView[];
   /** seq of the current round's round_started event. */
   roundStartSeq: number;
   /** Highest seq applied, so new events can be applied incrementally. */
@@ -99,6 +135,9 @@ export const EMPTY_GAME: GameView = {
   map: null,
   actions: [],
   hexHistory: {},
+  races: [],
+  cities: [],
+  orders: [],
   roundStartSeq: 0,
   lastSeq: 0,
 };
@@ -222,8 +261,60 @@ export function applyEvent(view: GameView, event: GameEvent): GameView {
         description: str(p.description) ?? '',
         cost: num(p.cost),
         hexes,
+        intent: str(p.intent),
       };
       next.actions = [...view.actions, action];
+      const origin: Origin = {
+        godId: event.god_id,
+        createdSeq: event.seq,
+        age: event.age,
+        round: event.round,
+      };
+      if (action.power === 'createRace') {
+        const race = asObj(p.race);
+        const order = asObj(p.order);
+        const id = str(race.id);
+        if (id) {
+          next.races = [
+            ...view.races,
+            {
+              ...origin,
+              id,
+              name: str(race.name) ?? action.choice,
+              description: str(race.description) ?? '',
+              appearance: str(race.appearance) ?? '',
+              alignment: num(race.alignment),
+              hex: hexOf(race.hex),
+            },
+          ];
+          const orderId = str(order.id);
+          if (orderId) {
+            next.orders = [
+              ...view.orders,
+              { ...origin, id: orderId, name: str(order.name) ?? '', raceId: id },
+            ];
+          }
+        }
+      }
+      if (action.power === 'commandRace' && action.intent === 'foundCity') {
+        const city = asObj(p.city);
+        const id = str(city.id);
+        const raceId = str(city.race_id);
+        if (id && raceId) {
+          next.cities = [
+            ...view.cities,
+            {
+              ...origin,
+              id,
+              name: str(city.name) ?? action.choice,
+              raceId,
+              alignment: num(city.alignment),
+              hex: hexOf(city.hex),
+              description: action.description,
+            },
+          ];
+        }
+      }
       if (event.god_id) {
         next.powers = {
           ...view.powers,
@@ -264,6 +355,10 @@ export function projectWorld(events: readonly GameEvent[], from: GameView = EMPT
   return [...events].sort((a, b) => a.seq - b.seq).reduce(applyEvent, from);
 }
 
+function hexOf(v: unknown): { x: number; y: number } {
+  return Array.isArray(v) ? { x: num(v[0]), y: num(v[1]) } : { x: 0, y: 0 };
+}
+
 function sortByOrder(incomes: Income[], order: string[]): Income[] {
   return [...incomes].sort((a, b) => order.indexOf(a.godId) - order.indexOf(b.godId));
 }
@@ -278,6 +373,46 @@ export function ageName(age: number): string {
 export function hexChanges(view: GameView, index: number): ActionRecord[] {
   const seqs = new Set(view.hexHistory[index] ?? []);
   return view.actions.filter((a) => seqs.has(a.seq));
+}
+
+/** The race whose homeland is on a hex, and the city there, if any. */
+export function settlementsAt(
+  view: GameView,
+  hex: { x: number; y: number },
+): { race: RaceView | null; city: CityView | null } {
+  const at = (h: { x: number; y: number }) => h.x === hex.x && h.y === hex.y;
+  return {
+    race: view.races.find((r) => at(r.hex)) ?? null,
+    city: view.cities.find((c) => at(c.hex)) ?? null,
+  };
+}
+
+/**
+ * The hexes a race can found a city on: its homeland, its cities, and their neighbors, as long
+ * as they're on the map, on land, not already a city, and not another race's homeland. Mirrors
+ * the server's checks in found_city so the app only offers moves the server will accept.
+ */
+export function cityCandidates(
+  view: GameView,
+  raceId: string,
+  isWater: (terrain: string) => boolean,
+  neighborsOf: (hex: { x: number; y: number }) => { x: number; y: number }[],
+): number[] {
+  const map = view.map;
+  const race = view.races.find((r) => r.id === raceId);
+  if (!map || !race) return [];
+  const key = (h: { x: number; y: number }) => h.y * map.width + h.x;
+  const land = [race.hex, ...view.cities.filter((c) => c.raceId === raceId).map((c) => c.hex)];
+  const taken = new Set([
+    ...view.cities.map((c) => key(c.hex)),
+    ...view.races.filter((r) => r.id !== raceId).map((r) => key(r.hex)),
+  ]);
+  const out = new Set<number>();
+  for (const h of land.flatMap((h) => [h, ...neighborsOf(h)])) {
+    const k = key(h);
+    if (!taken.has(k) && !isWater(map.terrain[k] ?? '')) out.add(k);
+  }
+  return [...out].sort((a, b) => a - b);
 }
 
 /** e.g. "Ends in 23h", "Ends in 12m", or "Time's up". */
