@@ -88,8 +88,8 @@ select pg_temp.check(
   'member can read world-mates'' profiles but not strangers''');
 
 -- Bob is not the host, so he cannot rename or delete the world.
-update public.worlds set name = 'Bobland';
-delete from public.worlds;
+update public.worlds set name = 'Bobland' where id = current_setting('test.world_id')::uuid;
+delete from public.worlds where id = current_setting('test.world_id')::uuid;
 reset role;
 select pg_temp.check(
   (select name from public.worlds where id = current_setting('test.world_id')::uuid) = 'Aerth',
@@ -126,7 +126,7 @@ select pg_temp.check((select count(*) from public.worlds) = 0, 'removed player l
 
 -- The host can rename the world.
 select pg_temp.act_as('00000000-0000-0000-0000-00000000000a');
-update public.worlds set name = 'Aerth Reborn';
+update public.worlds set name = 'Aerth Reborn' where id = current_setting('test.world_id')::uuid;
 reset role;
 select pg_temp.check(
   (select name from public.worlds where id = current_setting('test.world_id')::uuid) = 'Aerth Reborn',

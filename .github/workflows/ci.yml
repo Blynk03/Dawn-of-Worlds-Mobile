@@ -18,19 +18,25 @@ jobs:
       - run: npm run check
 
   database:
-    runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_PASSWORD: postgres
-        ports: ['5432:5432']
-        options: >-
-          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    # Uses the runner's own PostgreSQL 16 so we can add pg-safeupdate, which Supabase loads for
+    # app requests (it rejects DELETE/UPDATE without WHERE; see DOW-76).
+    runs-on: ubuntu-24.04
     env:
       PGHOST: localhost
       PGUSER: postgres
       PGPASSWORD: postgres
+      REQUIRE_SAFEUPDATE: '1'
     steps:
       - uses: actions/checkout@v4
+      - name: Install PostgreSQL 16 and pg-safeupdate
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q postgresql-16 postgresql-server-dev-16
+          git clone -q --depth 1 --branch 1.7 https://github.com/eradman/pg-safeupdate.git /tmp/pg-safeupdate
+          make -C /tmp/pg-safeupdate PG_CONFIG=/usr/lib/postgresql/16/bin/pg_config with_llvm=no
+          sudo make -C /tmp/pg-safeupdate install PG_CONFIG=/usr/lib/postgresql/16/bin/pg_config with_llvm=no
+      - name: Start PostgreSQL
+        run: |
+          sudo systemctl start postgresql
+          sudo -u postgres psql -q -c "alter user postgres password 'postgres'"
       - run: ./scripts/test-db.sh
