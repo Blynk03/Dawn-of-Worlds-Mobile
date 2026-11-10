@@ -167,7 +167,7 @@ select pg_temp.check((select count(*) from public.world_events) > 0, 'members ca
 select pg_temp.check((select count(*) from public.god_power) = 3, 'members can read every god''s power');
 select pg_temp.expect_error(format($q$insert into public.world_events (world_id, seq, age, round, type) values (%L, 999, 1, 1, 'fake')$q$,
   current_setting('test.w')), 'row-level security', 'players cannot write to the log');
-update public.god_power set power = 999;
+update public.god_power set power = 999 where world_id = current_setting('test.w')::uuid;
 reset role;
 select pg_temp.check((select max(power) from public.god_power where world_id = current_setting('test.w')::uuid) <= 12,
   'players cannot change power');
