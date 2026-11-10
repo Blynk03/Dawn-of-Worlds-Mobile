@@ -92,6 +92,31 @@ describe('GamePanel', () => {
     expect(api.endTurn).toHaveBeenCalledWith('w', true);
   });
 
+  it('gives the active player a way to shape the world', async () => {
+    const onAct = jest.fn();
+    await render(
+      <GamePanel worldId="w" gods={gods} members={members} myId={active.user_id} onAct={onAct} />,
+    );
+    await fireEvent.press(await screen.findByRole('button', { name: 'Shape the world' }));
+    expect(onAct).toHaveBeenCalled();
+  });
+
+  it('only offers Shape the world on your turn', async () => {
+    await render(
+      <GamePanel
+        worldId="w"
+        gods={gods}
+        members={members}
+        myId={first.user_id}
+        onAct={jest.fn()}
+      />,
+    );
+    expect(
+      await screen.findByText(`You can use ${first.name}'s powers on your turn.`),
+    ).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Shape the world' })).toBeNull();
+  });
+
   it('shows everyone else who they are waiting for, with the time left', async () => {
     await renderPanel(first.user_id);
     expect(

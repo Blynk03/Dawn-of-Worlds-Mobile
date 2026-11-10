@@ -87,14 +87,15 @@ export function GamePanelView({
           <>
             <ThemedText type="subtitle">Your turn</ThemedText>
             <ThemedText type="small" themeColor="textSecondary">
-              {active?.name} has {view.powers[active?.id ?? '']?.power ?? 0} power. Spending power
-              on the world arrives with the map; for now you can end your turn or pass.
+              {active?.name} has {view.powers[active?.id ?? '']?.power ?? 0} power. Use it to shape
+              the world, then end your turn (or pass to save it).
             </ThemedText>
             {deadlineText ? (
               <ThemedText type="small" themeColor="accent">
                 {deadlineText}
               </ThemedText>
             ) : null}
+            {onAct ? <Button title="Shape the world" onPress={onAct} disabled={!!busy} /> : null}
             <Button
               title="End turn"
               onPress={() => run('end')}
@@ -115,6 +116,11 @@ export function GamePanelView({
               Waiting for {active?.name ?? '…'} ({playerName(view.activeGodId)})
               {deadlineText ? ` · ${deadlineText}` : ''}
             </ThemedText>
+            {myGod ? (
+              <ThemedText type="small" themeColor="textSecondary">
+                You can use {myGod.name}&apos;s powers on your turn.
+              </ThemedText>
+            ) : null}
             {timedOut ? (
               <Button
                 title={`Skip ${active?.name ?? 'this'}'s turn`}
