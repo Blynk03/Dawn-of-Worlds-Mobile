@@ -55,6 +55,15 @@ export const RulesetSchema = z
       /** After this many rounds any single player may change the age. */
       anyPlayerAfterRounds: z.number().int().nonnegative(),
     }),
+    /** Map options: the server validates terrain and climate choices against these lists. */
+    map: z.object({
+      defaultSize: z.object({
+        width: z.number().int().min(8).max(64),
+        height: z.number().int().min(8).max(64),
+      }),
+      terrains: z.array(z.string().regex(/^[a-z]+$/)).min(2),
+      climates: z.array(z.string().regex(/^[a-z]+$/)).min(1),
+    }),
     powers: z.array(PowerSchema).min(1),
   })
   .superRefine((ruleset, ctx) => {

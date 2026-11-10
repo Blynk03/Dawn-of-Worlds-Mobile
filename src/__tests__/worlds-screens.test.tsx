@@ -34,12 +34,13 @@ jest.mock('@/worlds/invite', () => ({
   savePendingInvite: jest.fn(),
 }));
 jest.mock('@/worlds/share', () => ({ shareInvite: jest.fn(() => Promise.resolve('shared')) }));
-jest.mock('@/components/game-panel', () => ({
-  GamePanel: () => {
+jest.mock('@/components/active-world', () => ({
+  ActiveWorld: () => {
     const { View } = jest.requireActual('react-native');
-    return <View testID="game-panel" />;
+    return <View testID="active-world" />;
   },
 }));
+jest.mock('@/components/hex-map', () => jest.requireActual('../../test/hex-map-mock'));
 
 const mockApi = jest.mocked(api);
 
@@ -169,6 +170,7 @@ describe('World lobby (DOW-22)', () => {
       world: world(),
       members: [member('me', 'host', 'Lavelle'), member('bob', 'player', 'Bob')],
       gods: [god({ user_id: 'me' })],
+      map: null,
     });
     await render(<WorldScreen />);
     expect(await screen.findByText('ABC-234')).toBeTruthy();
@@ -186,6 +188,7 @@ describe('World lobby (DOW-22)', () => {
         god({ user_id: 'me' }),
         god({ id: 'g2', user_id: 'bob', name: 'Umbra', color: '#2563EB' }),
       ],
+      map: null,
     });
     mockApi.startWorld.mockResolvedValue();
     await render(<WorldScreen />);
@@ -200,6 +203,7 @@ describe('World lobby (DOW-22)', () => {
       world: world(),
       members: [member('me', 'host'), member('bob')],
       gods: [],
+      map: null,
     });
     mockApi.removeMember.mockResolvedValue();
     await render(<WorldScreen />);
@@ -214,6 +218,7 @@ describe('World lobby (DOW-22)', () => {
       world: world({ created_by: 'bob' }),
       members: [member('bob', 'host'), member('me')],
       gods: [],
+      map: null,
     });
     await render(<WorldScreen />);
     expect(await screen.findByRole('button', { name: 'Create your god' })).toBeTruthy();
@@ -232,9 +237,10 @@ describe('World screen once the game has started', () => {
         god({ user_id: 'me' }),
         god({ id: 'g2', user_id: 'bob', name: 'Umbra', color: '#2563EB' }),
       ],
+      map: null,
     });
     await render(<WorldScreen />);
-    expect(await screen.findByTestId('game-panel')).toBeTruthy();
+    expect(await screen.findByTestId('active-world')).toBeTruthy();
     expect(screen.queryByText(/Players \(/)).toBeNull();
     expect(screen.queryByText('Invite friends')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Start the First Age' })).toBeNull();
@@ -251,6 +257,7 @@ describe('God editor (DOW-23)', () => {
       world: world(),
       members: [member('me'), member('bob')],
       gods: [god({ id: 'g2', user_id: 'bob', name: 'Umbra', color: '#2563EB' })],
+      map: null,
     });
     mockApi.createGod.mockResolvedValue(god({}));
     await render(<GodScreen />);
@@ -280,7 +287,12 @@ describe('God editor (DOW-23)', () => {
   });
 
   it('limits spheres to 3', async () => {
-    mockApi.getLobby.mockResolvedValue({ world: world(), members: [member('me')], gods: [] });
+    mockApi.getLobby.mockResolvedValue({
+      world: world(),
+      members: [member('me')],
+      gods: [],
+      map: null,
+    });
     await render(<GodScreen />);
     await screen.findByLabelText('Name');
     for (const s of ['War', 'Sea', 'Sky']) await fireEvent.press(screen.getByLabelText(s));
@@ -293,6 +305,7 @@ describe('God editor (DOW-23)', () => {
       world: world({ status: 'active' }),
       members: [member('me')],
       gods: [god({ id: 'mine', user_id: 'me' })],
+      map: null,
     });
     mockApi.updateGod.mockResolvedValue(god({}));
     await render(<GodScreen />);

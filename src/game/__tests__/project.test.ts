@@ -4,12 +4,14 @@ import {
   describeDeadline,
   EMPTY_GAME,
   type GameEvent,
+  hexChanges,
   projectWorld,
 } from '../project';
 import fixture from './fixtures/server-game.json';
 
-// A short game played by the real database functions (scripts/game-fixture.sql): round 1 with an
-// end, a pass and a low-pool end; round 2 with an end and a timeout.
+// A short game played by the real database functions (scripts/game-fixture.sql): a 10×8 starting
+// landmass; round 1 with Shape Land (3 hexes) and Shape Climate, then an end, a pass and a low-pool
+// end; round 2 with Shape Land over an earlier hex, an end and a timeout.
 const events = fixture.events as GameEvent[];
 const server = fixture.state;
 
@@ -31,6 +33,28 @@ describe('projectWorld against a game played by the server', () => {
 
   it("matches the server: every god's power and low-pool bonus", () => {
     expect(view.powers).toEqual(fixture.powers);
+  });
+
+  it("matches the server's map exactly, terrain and climate", () => {
+    expect(view.map).toEqual(fixture.map);
+  });
+
+  it('records every action, with its cost', () => {
+    expect(view.actions.map((a) => [a.power, a.choice, a.cost])).toEqual([
+      ['shapeLand', 'mountains', 9],
+      ['shapeClimate', 'snow', 2],
+      ['shapeLand', 'forest', 6],
+    ]);
+  });
+
+  it("keeps each hex's history (DOW-33)", () => {
+    const width = fixture.map.width;
+    const reshaped = hexChanges(view, 2 * width + 2); // [2,2]: mountains, then forest
+    expect(reshaped.map((a) => a.choice)).toEqual(['mountains', 'forest']);
+    expect(reshaped[0].description).toBe('The Spine of the World rises');
+    const snowy = hexChanges(view, 2 * width + 3); // [3,2]: mountains, then snow
+    expect(snowy.map((a) => a.choice)).toEqual(['mountains', 'snow']);
+    expect(hexChanges(view, 0)).toEqual([]); // untouched ocean corner
   });
 
   it('lists the turns taken this round', () => {

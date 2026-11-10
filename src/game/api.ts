@@ -48,6 +48,24 @@ export async function skipTimedOutTurn(worldId: string): Promise<void> {
   if (error) throw new Error(friendlyError(error));
 }
 
+/** DOW-26: spends power on an action (Shape Land / Shape Climate so far). */
+export async function takeAction(
+  worldId: string,
+  powerId: string,
+  hexes: [number, number][],
+  choice: string,
+  description: string,
+): Promise<void> {
+  const { error } = await client().rpc('take_action', {
+    target_world: worldId,
+    power_id: powerId,
+    hexes,
+    choice,
+    description,
+  });
+  if (error) throw new Error(friendlyError(error));
+}
+
 let channelCounter = 0;
 
 /**

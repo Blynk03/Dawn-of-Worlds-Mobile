@@ -2,7 +2,7 @@
  * Supabase calls for worlds, membership and gods. Row-level security (supabase/migrations) decides
  * what each player can see and change; these functions just shape the requests and results.
  */
-import type { God, World, WorldMember, WorldState } from '@/lib/database.types';
+import type { God, World, WorldMapRow, WorldMember, WorldState } from '@/lib/database.types';
 import { supabase } from '@/lib/supabase';
 
 import { friendlyError } from './errors';
@@ -55,11 +55,13 @@ export type Lobby = {
   world: World;
   members: LobbyMember[];
   gods: God[];
+  /** The starting landmass, once the host has drawn one (or the game has started). */
+  map: WorldMapRow | null;
 };
 
 export async function getLobby(worldId: string): Promise<Lobby | null> {
   const db = client();
-  const [world, members, gods] = await Promise.all([
+  const [world, members, gods, map] = await Promise.all([
     db.from('worlds').select('*').eq('id', worldId).maybeSingle(),
     db
       .from('world_members')
@@ -67,6 +69,7 @@ export async function getLobby(worldId: string): Promise<Lobby | null> {
       .eq('world_id', worldId)
       .order('joined_at'),
     db.from('gods').select('*').eq('world_id', worldId).order('created_at'),
+    db.from('world_map').select('*').eq('world_id', worldId).maybeSingle(),
   ]);
   const worldRow = check(world);
   if (!worldRow) return null;
@@ -74,6 +77,7 @@ export async function getLobby(worldId: string): Promise<Lobby | null> {
     world: worldRow,
     members: (check(members) ?? []) as unknown as LobbyMember[],
     gods: check(gods) ?? [],
+    map: check(map) ?? null,
   };
 }
 
@@ -99,6 +103,23 @@ export async function createWorld(
 /** Joins by invite code and returns the world id. */
 export async function joinWorld(code: string): Promise<string> {
   return checkRow(await client().rpc('join_world', { code: normalizeInviteCode(code) }));
+}
+
+/** DOW-30: saves the starting landmass (host only, in the lobby). */
+export async function setInitialMap(
+  worldId: string,
+  width: number,
+  height: number,
+  terrain: string[],
+): Promise<void> {
+  check(
+    await client().rpc('set_initial_map', {
+      target_world: worldId,
+      map_width: width,
+      map_height: height,
+      terrain,
+    }),
+  );
 }
 
 export async function startWorld(worldId: string): Promise<void> {
