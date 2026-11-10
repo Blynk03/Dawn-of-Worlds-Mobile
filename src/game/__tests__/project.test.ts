@@ -1,17 +1,23 @@
+import { neighbors } from '@/map/hex';
+import { terrainInfo } from '@/map/terrain';
+
 import {
   ageName,
   applyEvent,
+  cityCandidates,
   describeDeadline,
   EMPTY_GAME,
   type GameEvent,
   hexChanges,
   projectWorld,
+  settlementsAt,
 } from '../project';
 import fixture from './fixtures/server-game.json';
 
 // A short game played by the real database functions (scripts/game-fixture.sql): a 10×8 starting
 // landmass; round 1 with Shape Land (3 hexes) and Shape Climate, then an end, a pass and a low-pool
-// end; round 2 with Shape Land over an earlier hex, an end and a timeout.
+// end; round 2 with Shape Land over an earlier hex, the Dwarves created on (4,4), the city of Karak
+// founded on (5,4), an end and a timeout.
 const events = fixture.events as GameEvent[];
 const server = fixture.state;
 
@@ -44,7 +50,71 @@ describe('projectWorld against a game played by the server', () => {
       ['shapeLand', 'mountains', 9],
       ['shapeClimate', 'snow', 2],
       ['shapeLand', 'forest', 6],
+      ['createRace', 'Dwarves', 22],
+      ['commandRace', 'Karak', 8],
     ]);
+  });
+
+  it("matches the server's races, sects and cities (DOW-34/35)", () => {
+    const byKind = (kind: string) => fixture.entities.filter((e) => e.kind === kind);
+    expect(
+      view.races.map((r) => ({
+        id: r.id,
+        name: r.name,
+        god_id: r.godId,
+        alignment: r.alignment,
+        hex: [r.hex.x, r.hex.y],
+      })),
+    ).toEqual(
+      byKind('race').map((e) => ({
+        id: e.id,
+        name: e.name,
+        god_id: e.god_id,
+        alignment: e.alignment,
+        hex: [e.hex_x, e.hex_y],
+      })),
+    );
+    expect(view.orders.map((o) => [o.id, o.name, o.raceId, o.godId])).toEqual(
+      byKind('order').map((e) => [e.id, e.name, e.race_id, e.god_id]),
+    );
+    expect(view.cities.map((c) => [c.id, c.name, c.raceId, c.alignment, c.hex.x, c.hex.y])).toEqual(
+      byKind('city').map((e) => [e.id, e.name, e.race_id, e.alignment, e.hex_x, e.hex_y]),
+    );
+    expect(view.races[0]).toMatchObject({
+      description: 'Stout folk of the deep halls',
+      appearance: 'Short and bearded',
+    });
+    expect(view.cities[0].description).toBe('A hall is carved into the hill');
+  });
+
+  it('finds what is settled on a hex', () => {
+    expect(settlementsAt(view, { x: 4, y: 4 }).race?.name).toBe('Dwarves');
+    expect(settlementsAt(view, { x: 5, y: 4 }).city?.name).toBe('Karak');
+    expect(settlementsAt(view, { x: 1, y: 1 })).toEqual({ race: null, city: null });
+  });
+
+  it("offers city sites the server accepts: on or next to the race's land, on dry land", () => {
+    const width = fixture.map.width;
+    const sites = cityCandidates(
+      view,
+      view.races[0].id,
+      (t) => terrainInfo(t).water,
+      (h) => neighbors(h, width, fixture.map.height),
+    ).map((i) => [i % width, Math.floor(i / width)]);
+    // Homeland (4,4) is offered; Karak's hex (5,4) is not; (6,4) is next to Karak.
+    expect(sites).toContainEqual([4, 4]);
+    expect(sites).not.toContainEqual([5, 4]);
+    expect(sites).toContainEqual([6, 4]);
+    expect(sites).toContainEqual([3, 5]); // even-row neighbor of the homeland
+    expect(sites).not.toContainEqual([5, 6]); // two hexes away
+    expect(
+      cityCandidates(
+        view,
+        'nope',
+        () => false,
+        () => [],
+      ),
+    ).toEqual([]);
   });
 
   it("keeps each hex's history (DOW-33)", () => {

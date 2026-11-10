@@ -1,38 +1,49 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { type ReactNode, useMemo, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
 
+import {
+  ACT_OPTIONS,
+  type ActKind,
+  CostSummary,
+  PowerPicker,
+  RaceFields,
+} from '@/components/act-forms';
 import { useAuth } from '@/auth/auth-provider';
 import { Button, TextField } from '@/components/form';
-import { Card, Chip, ErrorMessage, SectionLabel } from '@/components/game-ui';
+import { Chip, ErrorMessage, SectionLabel } from '@/components/game-ui';
 import { HexMap } from '@/components/hex-map';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
-import { takeAction } from '@/game/api';
+import { createRace, foundCity, takeAction } from '@/game/api';
 import { useGame } from '@/game/hooks';
+import { ageName, cityCandidates, settlementsAt } from '@/game/project';
 import { useLayoutMode } from '@/hooks/use-layout-mode';
 import { SIDE_PANEL_WIDTH } from '@/layout/breakpoints';
-import { type Hex, hexFromIndex, hexIndex } from '@/map/hex';
-import { CLIMATE_IDS, CLIMATES, TERRAIN_IDS, TERRAINS } from '@/map/terrain';
+import { type Hex, hexFromIndex, hexIndex, neighbors } from '@/map/hex';
+import { mapMarkers } from '@/map/markers';
+import { CLIMATE_IDS, CLIMATES, TERRAIN_IDS, TERRAINS, terrainInfo } from '@/map/terrain';
 import { getActionCost } from '@/rules/actions';
 import { CLASSIC_RULESET } from '@/rules/ruleset';
 import type { Age } from '@/rules/schema';
 import { useLobby } from '@/worlds/hooks';
 
-type PowerId = 'shapeLand' | 'shapeClimate';
 const MAX_HEXES = 64;
+const isWater = (terrain: string) => terrainInfo(terrain).water;
 
-const POWERS: { id: PowerId; name: string; blurb: string }[] = [
-  {
-    id: 'shapeLand',
-    name: 'Shape Land',
-    blurb: 'Raise mountains, plant forests, flood the lowlands.',
-  },
-  { id: 'shapeClimate', name: 'Shape Climate', blurb: 'Set the weather that rules a region.' },
-];
+type RaceDraft = {
+  name: string;
+  description: string;
+  appearance: string;
+  alignment: -1 | 0 | 1;
+};
 
-/** DOW-26 (core) + DOW-31/32: choose a power, pick hexes on the map, describe it, and confirm. */
+/**
+ * DOW-26: the action composer. Pick a power (grouped, with this age's cost), choose where on the
+ * map, describe it, and confirm. Powers: Shape Land and Shape Climate (DOW-31/32), Create Race
+ * (DOW-34) and Command Race to found a city (DOW-35).
+ */
 export default function ActScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
@@ -41,14 +52,38 @@ export default function ActScreen() {
   const { view, loaded } = useGame(id, true);
   const { data: lobby } = useLobby(id);
 
-  const [power, setPower] = useState<PowerId>('shapeLand');
+  const [kind, setKind] = useState<ActKind | null>(null);
+  // Shape Land / Shape Climate
   const [choice, setChoice] = useState<string>('mountains');
   const [selected, setSelected] = useState<Set<number>>(new Set());
+  // Create Race
+  const [race, setRace] = useState<RaceDraft>({
+    name: '',
+    description: '',
+    appearance: '',
+    alignment: 0,
+  });
+  // Found a city
+  const [raceId, setRaceId] = useState<string | null>(null);
+  const [cityName, setCityName] = useState('');
+  // Create Race and Found a city both pick one hex.
+  const [hex, setHex] = useState<number | null>(null);
+
   const [description, setDescription] = useState('');
+  const [note, setNote] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const map = view.map;
+  const gods = lobby?.gods;
+  const markers = useMemo(() => (gods ? mapMarkers(view, gods) : []), [view, gods]);
+  const chosenRace = raceId ?? view.races[0]?.id ?? null;
+  const candidates = useMemo(() => {
+    if (kind !== 'foundCity' || !chosenRace || !view.map) return undefined;
+    const { width, height } = view.map;
+    return new Set(cityCandidates(view, chosenRace, isWater, (h) => neighbors(h, width, height)));
+  }, [kind, chosenRace, view]);
+
   const activeGod = lobby?.gods.find((g) => g.id === view.activeGodId);
   const myTurn = !!activeGod && activeGod.user_id === session?.user.id;
 
@@ -68,38 +103,71 @@ export default function ActScreen() {
     );
   }
 
+  const age = view.age as Age;
   const myPower = view.powers[activeGod.id]?.power ?? 0;
-  const count = selected.size;
-  const cost = count > 0 ? getActionCost(CLASSIC_RULESET, power, view.age as Age, count) : 0;
-  const perHex = getActionCost(CLASSIC_RULESET, power, view.age as Age, 1);
-  const tooExpensive = cost > myPower;
-  const choices: string[] =
-    power === 'shapeLand' ? TERRAIN_IDS : [...CLIMATE_IDS.filter((c) => c !== 'none'), 'none']; // "No special climate" clears it
+  const unitCost = Object.fromEntries(
+    ACT_OPTIONS.map((o) => [o.kind, getActionCost(CLASSIC_RULESET, o.power, age, 1)]),
+  ) as Record<ActKind, number>;
+  const disabledReasons: Partial<Record<ActKind, string>> = {};
+  for (const o of ACT_OPTIONS) {
+    if (unitCost[o.kind] > myPower) {
+      disabledReasons[o.kind] = `Needs ${unitCost[o.kind]} power${o.perHex ? ' per hex' : ''}`;
+    }
+  }
+  if (view.races.length === 0) disabledReasons.foundCity = 'No races yet: create one first';
 
-  const toggleHex = (hex: Hex) => {
-    const index = hexIndex(hex, map.width);
-    setSelected((current) => {
-      const next = new Set(current);
-      if (next.has(index)) next.delete(index);
-      else if (next.size < MAX_HEXES) next.add(index);
-      return next;
-    });
+  const pick = (next: ActKind | null) => {
+    setKind(next);
+    setSelected(new Set());
+    setHex(null);
+    setNote(null);
+    setError(null);
+    if (next === 'shapeLand') setChoice('mountains');
+    if (next === 'shapeClimate') setChoice('rain');
   };
 
-  const pickPower = (next: PowerId) => {
-    setPower(next);
-    setChoice(next === 'shapeLand' ? 'mountains' : 'rain');
+  const onTapHex = (tapped: Hex) => {
+    const index = hexIndex(tapped, map.width);
+    setNote(null);
+    if (kind === 'shapeLand' || kind === 'shapeClimate') {
+      setSelected((current) => {
+        const next = new Set(current);
+        if (next.has(index)) next.delete(index);
+        else if (next.size < MAX_HEXES) next.add(index);
+        return next;
+      });
+    } else if (kind === 'createRace') {
+      const here = settlementsAt(view, tapped);
+      if (isWater(map.terrain[index] ?? '')) setNote('That hex is water; choose land.');
+      else if (here.race || here.city) setNote('Someone already lives there.');
+      else setHex(index === hex ? null : index);
+    } else if (kind === 'foundCity') {
+      if (candidates?.has(index)) setHex(index === hex ? null : index);
+      else setNote('Choose a highlighted hex, on or next to the race’s land.');
+    }
   };
 
-  const confirm = async () => {
+  const shaping = kind === 'shapeLand' || kind === 'shapeClimate';
+  const count = shaping ? selected.size : hex === null ? 0 : 1;
+  const cost = kind
+    ? getActionCost(
+        CLASSIC_RULESET,
+        ACT_OPTIONS.find((o) => o.kind === kind)!.power,
+        age,
+        shaping ? Math.max(count, 1) : 1,
+      )
+    : 0;
+  const affordable = cost <= myPower;
+  const hexLabel = (index: number) => {
+    const h = hexFromIndex(index, map.width);
+    return `hex ${h.x}, ${h.y}`;
+  };
+
+  const run = async (action: () => Promise<unknown>) => {
     setBusy(true);
     setError(null);
     try {
-      const hexes = [...selected].map((i) => {
-        const h = hexFromIndex(i, map.width);
-        return [h.x, h.y] as [number, number];
-      });
-      await takeAction(id, power, hexes, choice, description);
+      await action();
       router.back();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -108,57 +176,37 @@ export default function ActScreen() {
   };
 
   const choiceName = (c: string) =>
-    power === 'shapeLand'
+    kind === 'shapeLand'
       ? TERRAINS[c as keyof typeof TERRAINS].name
       : CLIMATES[c as keyof typeof CLIMATES].name;
 
-  const controls = (
-    <ScrollView contentContainerStyle={styles.controls} keyboardShouldPersistTaps="handled">
-      <ThemedText type="small" themeColor="textSecondary">
-        {activeGod.name} has {myPower} power.
-      </ThemedText>
-
-      <SectionLabel>Power</SectionLabel>
-      <View style={styles.wrap}>
-        {POWERS.map((p) => (
-          <Chip
-            key={p.id}
-            label={p.name}
-            selected={power === p.id}
-            onPress={() => pickPower(p.id)}
-          />
-        ))}
-      </View>
-      <ThemedText type="small" themeColor="textSecondary">
-        {POWERS.find((p) => p.id === power)?.blurb} {perHex} power per hex in this age. Races,
-        cities and other powers arrive in later updates.
-      </ThemedText>
-
-      <SectionLabel>{power === 'shapeLand' ? 'Terrain' : 'Climate'}</SectionLabel>
-      <View style={styles.wrap}>
-        {choices.map((c) => (
-          <Chip
-            key={c}
-            label={choiceName(c)}
-            selected={choice === c}
-            onPress={() => setChoice(c)}
-          />
-        ))}
-      </View>
-
-      <Card>
-        <ThemedText type="smallBold">
-          {count === 0
-            ? 'Tap hexes on the map to choose where.'
-            : `${count} ${count === 1 ? 'hex' : 'hexes'} → ${choiceName(choice)} · costs ${cost}`}
-        </ThemedText>
-        {tooExpensive ? (
-          <ErrorMessage message={`That costs ${cost} power; you have ${myPower}.`} />
-        ) : count > 0 ? (
-          <ThemedText type="small" themeColor="textSecondary">
-            You&apos;ll have {myPower - cost} power left.
-          </ThemedText>
-        ) : null}
+  let form: ReactNode = null;
+  if (shaping) {
+    const choices: string[] =
+      kind === 'shapeLand' ? TERRAIN_IDS : [...CLIMATE_IDS.filter((c) => c !== 'none'), 'none']; // "No special climate" clears it
+    form = (
+      <>
+        <SectionLabel>{kind === 'shapeLand' ? 'Terrain' : 'Climate'}</SectionLabel>
+        <View style={styles.wrap}>
+          {choices.map((c) => (
+            <Chip
+              key={c}
+              label={choiceName(c)}
+              selected={choice === c}
+              onPress={() => setChoice(c)}
+            />
+          ))}
+        </View>
+        <CostSummary
+          headline={
+            count === 0
+              ? 'Tap hexes on the map to choose where.'
+              : `${count} ${count === 1 ? 'hex' : 'hexes'} → ${choiceName(choice)}`
+          }
+          cost={cost}
+          power={myPower}
+          ready={count > 0}
+        />
         {count > 0 ? (
           <Button
             title="Clear selection"
@@ -166,36 +214,159 @@ export default function ActScreen() {
             onPress={() => setSelected(new Set())}
           />
         ) : null}
-      </Card>
+        <DescriptionField value={description} onChange={setDescription} />
+        <Button
+          title={kind === 'shapeLand' ? 'Shape the land' : 'Shape the climate'}
+          onPress={() =>
+            run(() =>
+              takeAction(
+                id,
+                kind,
+                [...selected].map((i) => {
+                  const h = hexFromIndex(i, map.width);
+                  return [h.x, h.y] as [number, number];
+                }),
+                choice,
+                description,
+              ),
+            )
+          }
+          busy={busy}
+          disabled={count === 0 || !affordable || !description.trim()}
+        />
+      </>
+    );
+  } else if (kind === 'createRace') {
+    form = (
+      <>
+        <RaceFields
+          {...race}
+          onChange={(patch) => setRace((current) => ({ ...current, ...patch }))}
+        />
+        <CostSummary
+          headline={
+            hex === null
+              ? 'Tap a land hex on the map for their homeland.'
+              : `Homeland: ${hexLabel(hex)} (${terrainInfo(map.terrain[hex] ?? '').name})`
+          }
+          cost={cost}
+          power={myPower}
+          ready={hex !== null}
+        />
+        <Button
+          title="Create the race"
+          onPress={() =>
+            run(() =>
+              createRace(id, {
+                name: race.name,
+                description: race.description,
+                appearance: race.appearance,
+                alignment: race.alignment,
+                hex: hexFromIndex(hex!, map.width),
+              }),
+            )
+          }
+          busy={busy}
+          disabled={hex === null || !affordable || !race.name.trim() || !race.description.trim()}
+        />
+      </>
+    );
+  } else if (kind === 'foundCity') {
+    const raceName = view.races.find((r) => r.id === chosenRace)?.name ?? 'the race';
+    form = (
+      <>
+        <SectionLabel>Race</SectionLabel>
+        <View style={styles.wrap}>
+          {view.races.map((r) => (
+            <Chip
+              key={r.id}
+              label={r.name}
+              selected={chosenRace === r.id}
+              onPress={() => {
+                setRaceId(r.id);
+                setHex(null);
+              }}
+            />
+          ))}
+        </View>
+        <TextField
+          label="City name"
+          value={cityName}
+          onChangeText={setCityName}
+          placeholder="Karak Varn"
+          maxLength={40}
+        />
+        <CostSummary
+          headline={
+            hex === null
+              ? `Tap a highlighted hex, on or next to the ${raceName}’s land.`
+              : `${cityName.trim() || 'The city'} on ${hexLabel(hex)}`
+          }
+          cost={cost}
+          power={myPower}
+          ready={hex !== null}
+        />
+        <DescriptionField value={description} onChange={setDescription} />
+        <Button
+          title="Found the city"
+          onPress={() =>
+            run(() =>
+              foundCity(id, chosenRace!, cityName, hexFromIndex(hex!, map.width), description),
+            )
+          }
+          busy={busy}
+          disabled={
+            !chosenRace || hex === null || !affordable || !cityName.trim() || !description.trim()
+          }
+        />
+      </>
+    );
+  }
 
-      <TextField
-        label="What happens?"
-        value={description}
-        onChangeText={setDescription}
-        placeholder="The Spine of the World rises from the plains…"
-        maxLength={280}
-        multiline
-        style={styles.multiline}
-      />
-      <Button
-        title={power === 'shapeLand' ? 'Shape the land' : 'Shape the climate'}
-        onPress={confirm}
-        busy={busy}
-        disabled={count === 0 || tooExpensive || !description.trim()}
-      />
-      <ErrorMessage message={error} />
+  const option = ACT_OPTIONS.find((o) => o.kind === kind);
+  const controls = (
+    <ScrollView contentContainerStyle={styles.controls} keyboardShouldPersistTaps="handled">
+      <ThemedText type="small" themeColor="textSecondary">
+        {activeGod.name} has {myPower} power.
+      </ThemedText>
+      {option ? (
+        <>
+          <View style={styles.titleRow}>
+            <View style={styles.fill}>
+              <ThemedText type="subtitle">{option.name}</ThemedText>
+              <ThemedText type="small" themeColor="textSecondary">
+                {option.blurb} {unitCost[option.kind]} power
+                {option.perHex ? ' per hex' : ''} in the {ageName(age)}.
+              </ThemedText>
+            </View>
+          </View>
+          <Button title="Choose another power" variant="secondary" onPress={() => pick(null)} />
+          {note ? <ErrorMessage message={note} /> : null}
+          {form}
+          <ErrorMessage message={error} />
+        </>
+      ) : (
+        <PowerPicker costs={unitCost} disabledReasons={disabledReasons} onPick={pick} />
+      )}
     </ScrollView>
   );
 
+  const mapSelection = shaping ? selected : hex === null ? undefined : new Set([hex]);
   const mapView = (
     <View style={styles.fill}>
-      <HexMap map={map} selected={selected} onTapHex={toggleHex} />
+      <HexMap
+        map={map}
+        markers={markers}
+        candidates={candidates}
+        selected={mapSelection}
+        onTapHex={kind ? onTapHex : undefined}
+      />
     </View>
   );
 
   return (
     <ThemedView style={styles.fill}>
-      <Stack.Screen options={{ title: 'Shape the world' }} />
+      <Stack.Screen options={{ title: option?.name ?? 'Use a power' }} />
       {mode === 'tablet' ? (
         <View style={[styles.fill, styles.row]}>
           {mapView}
@@ -211,14 +382,29 @@ export default function ActScreen() {
   );
 }
 
+function DescriptionField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  return (
+    <TextField
+      label="What happens?"
+      value={value}
+      onChangeText={onChange}
+      placeholder="Describe it for the chronicle…"
+      maxLength={280}
+      multiline
+      style={styles.multiline}
+    />
+  );
+}
+
 const styles = StyleSheet.create({
   fill: { flex: 1 },
   row: { flexDirection: 'row' },
   center: { alignItems: 'center', justifyContent: 'center', gap: Spacing.three },
   pad: { padding: Spacing.four },
   side: { width: SIDE_PANEL_WIDTH + 40 },
-  phoneMap: { height: '50%' },
+  phoneMap: { height: '45%' },
   controls: { gap: Spacing.two, padding: Spacing.three, paddingBottom: Spacing.six },
+  titleRow: { flexDirection: 'row', alignItems: 'center' },
   wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
   multiline: { minHeight: 72, textAlignVertical: 'top' },
 });

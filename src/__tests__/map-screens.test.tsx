@@ -33,7 +33,6 @@ const worlds = jest.mocked(worldsApi);
 // The real server-played game (round 2, First Age): its active god belongs to "u-active".
 const view = projectWorld(fixture.events as GameEvent[]);
 const activeGodId = view.activeGodId!;
-const activePower = view.powers[activeGodId].power;
 
 const world = (o: Partial<World> = {}): World => ({
   id: 'w1',
@@ -89,11 +88,90 @@ beforeEach(() => {
   });
 });
 
-describe('Shape the world (DOW-26/31/32)', () => {
+/** The fixture's events plus one more logged action that leaves the active god with `power`. */
+function eventsWithPower(power: number, events = fixture.events as GameEvent[]): GameEvent[] {
+  const last = events[events.length - 1];
+  return [
+    ...events,
+    {
+      ...last,
+      seq: last.seq + 1,
+      type: 'action_taken',
+      god_id: activeGodId,
+      payload: {
+        power: 'shapeClimate',
+        cost: 0,
+        hexes: [[9, 7]],
+        choice: 'none',
+        description: 'x',
+        power_after: power,
+      },
+    },
+  ];
+}
+
+async function openPower(name: string) {
+  await screen.findByText(/has \d+ power\./);
+  await fireEvent.press(screen.getByRole('button', { name }));
+}
+
+describe('Choosing a power (DOW-26)', () => {
+  it('groups powers by category with this age’s cost', async () => {
+    game.loadGameEvents.mockResolvedValue(eventsWithPower(100));
+    await render(<ActScreen />);
+    expect(await screen.findByText('Solara has 100 power.')).toBeTruthy();
+    expect(screen.getByText('Land')).toBeTruthy();
+    expect(screen.getByText('Races')).toBeTruthy();
+    expect(screen.getByText('3 / hex')).toBeTruthy(); // Shape Land, First Age
+    expect(screen.getByText('22')).toBeTruthy(); // Create Race
+    for (const name of ['Shape Land', 'Shape Climate', 'Create Race', 'Found a city']) {
+      expect(screen.getByRole('button', { name })).toBeEnabled();
+    }
+  });
+
+  it('greys out powers you can’t afford and says why', async () => {
+    game.loadGameEvents.mockResolvedValue(eventsWithPower(4));
+    await render(<ActScreen />);
+    await screen.findByText('Solara has 4 power.');
+    expect(screen.getByRole('button', { name: 'Shape Land' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Create Race' })).toBeDisabled();
+    expect(screen.getByText('Needs 22 power')).toBeTruthy();
+    expect(screen.getByText('Needs 8 power')).toBeTruthy(); // Found a city
+  });
+
+  it('can’t found a city before there are races', async () => {
+    const noRaces = (fixture.events as GameEvent[]).filter(
+      (e) => !['createRace', 'commandRace'].includes((e.payload as { power?: string }).power ?? ''),
+    );
+    game.loadGameEvents.mockResolvedValue(eventsWithPower(100, noRaces));
+    await render(<ActScreen />);
+    await screen.findByText('Solara has 100 power.');
+    expect(screen.getByRole('button', { name: 'Found a city' })).toBeDisabled();
+    expect(screen.getByText('No races yet: create one first')).toBeTruthy();
+  });
+
+  it('can go back and choose another power', async () => {
+    game.loadGameEvents.mockResolvedValue(eventsWithPower(100));
+    await render(<ActScreen />);
+    await openPower('Shape Land');
+    await fireEvent.press(screen.getByRole('button', { name: 'Choose another power' }));
+    expect(screen.getByRole('button', { name: 'Create Race' })).toBeTruthy();
+  });
+
+  it("tells other players it isn't their turn", async () => {
+    mockAuthUser = 'u-2';
+    await render(<ActScreen />);
+    expect(await screen.findByText("It isn't your turn right now.")).toBeTruthy();
+  });
+});
+
+describe('Shape Land and Shape Climate (DOW-31/32)', () => {
+  beforeEach(() => game.loadGameEvents.mockResolvedValue(eventsWithPower(50)));
+
   it('shapes land: pick terrain, tap hexes, see the cost, describe it, confirm', async () => {
     await render(<ActScreen />);
-    expect(await screen.findByText(`Solara has ${activePower} power.`)).toBeTruthy();
-    expect(screen.getByText(/3 power per hex in this age/)).toBeTruthy();
+    await openPower('Shape Land');
+    expect(screen.getByText(/3 power per hex in the First Age/)).toBeTruthy();
 
     const confirm = () => screen.getByRole('button', { name: 'Shape the land' });
     expect(confirm()).toBeDisabled();
@@ -101,8 +179,8 @@ describe('Shape the world (DOW-26/31/32)', () => {
     await fireEvent.press(screen.getByLabelText('Hills'));
     await fireEvent.press(screen.getByLabelText('hex 1,0'));
     await fireEvent.press(screen.getByLabelText('hex 2,0'));
-    expect(screen.getByText('2 hexes → Hills · costs 6')).toBeTruthy();
-    expect(screen.getByText(`You'll have ${activePower - 6} power left.`)).toBeTruthy();
+    expect(screen.getByText('2 hexes → Hills')).toBeTruthy();
+    expect(screen.getByText("Costs 6. You'll have 44 power left.")).toBeTruthy();
     expect(confirm()).toBeDisabled(); // still needs a description
 
     await fireEvent.changeText(screen.getByLabelText('What happens?'), 'Rolling hills rise');
@@ -122,7 +200,7 @@ describe('Shape the world (DOW-26/31/32)', () => {
 
   it('tapping a chosen hex again unchooses it', async () => {
     await render(<ActScreen />);
-    await screen.findByText(/power per hex/);
+    await openPower('Shape Land');
     await fireEvent.press(screen.getByLabelText('hex 1,0'));
     await fireEvent.press(screen.getByLabelText('hex 1,0'));
     expect(screen.getByText('selected none')).toBeTruthy();
@@ -130,9 +208,8 @@ describe('Shape the world (DOW-26/31/32)', () => {
 
   it('shapes climate at its own price', async () => {
     await render(<ActScreen />);
-    await screen.findByText(/power per hex/);
-    await fireEvent.press(screen.getByLabelText('Shape Climate'));
-    expect(screen.getByText(/2 power per hex in this age/)).toBeTruthy();
+    await openPower('Shape Climate');
+    expect(screen.getByText(/2 power per hex in the First Age/)).toBeTruthy();
     await fireEvent.press(screen.getByLabelText('Snow'));
     await fireEvent.press(screen.getByLabelText('hex 3,0'));
     await fireEvent.changeText(screen.getByLabelText('What happens?'), 'Snowfall');
@@ -147,27 +224,9 @@ describe('Shape the world (DOW-26/31/32)', () => {
   });
 
   it("won't let you spend more than you have", async () => {
-    // One more logged action leaves the active god with 4 power.
-    const last = fixture.events[fixture.events.length - 1];
-    game.loadGameEvents.mockResolvedValue([
-      ...(fixture.events as GameEvent[]),
-      {
-        ...last,
-        seq: last.seq + 1,
-        type: 'action_taken',
-        god_id: activeGodId,
-        payload: {
-          power: 'shapeLand',
-          cost: 3,
-          hexes: [[9, 7]],
-          choice: 'hills',
-          description: 'x',
-          power_after: 4,
-        },
-      },
-    ]);
+    game.loadGameEvents.mockResolvedValue(eventsWithPower(4));
     await render(<ActScreen />);
-    expect(await screen.findByText('Solara has 4 power.')).toBeTruthy();
+    await openPower('Shape Land');
     await fireEvent.press(screen.getByLabelText('hex 1,0'));
     await fireEvent.press(screen.getByLabelText('hex 2,0'));
     expect(screen.getByText('That costs 6 power; you have 4.')).toBeTruthy();
@@ -178,18 +237,100 @@ describe('Shape the world (DOW-26/31/32)', () => {
   it('shows server errors and stays on the screen', async () => {
     game.takeAction.mockRejectedValueOnce(new Error("It isn't your turn"));
     await render(<ActScreen />);
-    await screen.findByText(/power per hex/);
+    await openPower('Shape Land');
     await fireEvent.press(screen.getByLabelText('hex 1,0'));
     await fireEvent.changeText(screen.getByLabelText('What happens?'), 'Peaks');
     await fireEvent.press(screen.getByRole('button', { name: 'Shape the land' }));
     expect(await screen.findByText("It isn't your turn")).toBeTruthy();
     expect(mockRouter.back).not.toHaveBeenCalled();
   });
+});
 
-  it("tells other players it isn't their turn", async () => {
-    mockAuthUser = 'u-2';
+describe('Create Race (DOW-34)', () => {
+  beforeEach(() => {
+    game.loadGameEvents.mockResolvedValue(eventsWithPower(30));
+    game.createRace.mockResolvedValue('new-race');
+  });
+
+  it('names the race, sets its alignment and homeland, and creates it', async () => {
     await render(<ActScreen />);
-    expect(await screen.findByText("It isn't your turn right now.")).toBeTruthy();
+    await openPower('Create Race');
+    expect(screen.getByText('marker race Dwarves at 44')).toBeTruthy(); // existing races show
+    const confirm = () => screen.getByRole('button', { name: 'Create the race' });
+    expect(confirm()).toBeDisabled();
+
+    await fireEvent.changeText(screen.getByLabelText('Race name'), 'Elves');
+    await fireEvent.changeText(
+      screen.getByLabelText('What are they like?'),
+      'Children of the woods',
+    );
+    await fireEvent.changeText(screen.getByLabelText('Appearance (optional)'), 'Tall and fair');
+    await fireEvent.press(screen.getByLabelText('Evil'));
+    expect(confirm()).toBeDisabled(); // still needs a homeland
+
+    await fireEvent.press(screen.getByLabelText('hex 2,3'));
+    expect(screen.getByText('Homeland: hex 2, 3 (Grassland)')).toBeTruthy();
+    expect(screen.getByText("Costs 22. You'll have 8 power left.")).toBeTruthy();
+    await fireEvent.press(confirm());
+    expect(game.createRace).toHaveBeenCalledWith('w1', {
+      name: 'Elves',
+      description: 'Children of the woods',
+      appearance: 'Tall and fair',
+      alignment: -1,
+      hex: { x: 2, y: 3 },
+    });
+    expect(mockRouter.back).toHaveBeenCalled();
+  });
+
+  it('only settles empty land', async () => {
+    await render(<ActScreen />);
+    await openPower('Create Race');
+    await fireEvent.press(screen.getByLabelText('hex 0,0')); // ocean border
+    expect(screen.getByText('That hex is water; choose land.')).toBeTruthy();
+    await fireEvent.press(screen.getByLabelText('hex 4,4')); // the Dwarves' homeland
+    expect(screen.getByText('Someone already lives there.')).toBeTruthy();
+    expect(screen.getByText('selected none')).toBeTruthy();
+  });
+});
+
+describe('Found a city (DOW-35)', () => {
+  const dwarves = view.races[0];
+
+  beforeEach(() => {
+    game.loadGameEvents.mockResolvedValue(eventsWithPower(30));
+    game.foundCity.mockResolvedValue('new-city');
+  });
+
+  it("highlights the race's land and founds a city there", async () => {
+    await render(<ActScreen />);
+    await openPower('Found a city');
+    // On or next to the homeland (4,4) and Karak (5,4); never on Karak itself.
+    const candidates = screen.getByText(/^candidates /).props.children as string;
+    const list = candidates.replace('candidates ', '').split(',').map(Number);
+    expect(list).toEqual(expect.arrayContaining([44, 46, 35]));
+    expect(list).not.toContain(45);
+
+    await fireEvent.press(screen.getByLabelText('hex 6,4'));
+    await fireEvent.changeText(screen.getByLabelText('City name'), 'Irondeep');
+    expect(screen.getByText('Irondeep on hex 6, 4')).toBeTruthy();
+    expect(screen.getByText("Costs 8. You'll have 22 power left.")).toBeTruthy();
+    await fireEvent.changeText(screen.getByLabelText('What happens?'), 'Miners follow a vein east');
+    await fireEvent.press(screen.getByRole('button', { name: 'Found the city' }));
+    expect(game.foundCity).toHaveBeenCalledWith(
+      'w1',
+      dwarves.id,
+      'Irondeep',
+      { x: 6, y: 4 },
+      'Miners follow a vein east',
+    );
+  });
+
+  it("won't found a city away from the race's land", async () => {
+    await render(<ActScreen />);
+    await openPower('Found a city');
+    await fireEvent.press(screen.getByLabelText('hex 1,1'));
+    expect(screen.getByText(/Choose a highlighted hex/)).toBeTruthy();
+    expect(screen.getByText('selected none')).toBeTruthy();
   });
 });
 

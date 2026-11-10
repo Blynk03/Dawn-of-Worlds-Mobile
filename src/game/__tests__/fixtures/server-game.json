@@ -173,10 +173,10 @@
     "round": 2,
     "turn_order": [
       "aaaaaaaa-0000-0000-0000-000000000001",
-      "cccccccc-0000-0000-0000-000000000003",
-      "bbbbbbbb-0000-0000-0000-000000000002"
+      "bbbbbbbb-0000-0000-0000-000000000002",
+      "cccccccc-0000-0000-0000-000000000003"
     ],
-    "turn_deadline": "2026-11-12T01:56:58.058153+00:00",
+    "turn_deadline": "2026-11-12T06:36:57.553319+00:00",
     "active_position": 3
   },
   "events": [
@@ -379,8 +379,8 @@
       "round": 1,
       "god_id": "aaaaaaaa-0000-0000-0000-000000000001",
       "payload": {
-        "dice": [3, 2],
-        "total": 5,
+        "dice": [3, 6],
+        "total": 9,
         "god_id": "aaaaaaaa-0000-0000-0000-000000000001",
         "purpose": "income"
       },
@@ -393,8 +393,8 @@
       "round": 1,
       "god_id": "bbbbbbbb-0000-0000-0000-000000000002",
       "payload": {
-        "dice": [6, 4],
-        "total": 10,
+        "dice": [1, 5],
+        "total": 6,
         "god_id": "bbbbbbbb-0000-0000-0000-000000000002",
         "purpose": "income"
       },
@@ -407,8 +407,8 @@
       "round": 1,
       "god_id": "cccccccc-0000-0000-0000-000000000003",
       "payload": {
-        "dice": [2, 5],
-        "total": 7,
+        "dice": [3, 6],
+        "total": 9,
         "god_id": "cccccccc-0000-0000-0000-000000000003",
         "purpose": "income"
       },
@@ -417,6 +417,34 @@
     {
       "age": 1,
       "seq": 6,
+      "type": "dice_rolled",
+      "round": 1,
+      "god_id": "aaaaaaaa-0000-0000-0000-000000000001",
+      "payload": {
+        "dice": [3, 3],
+        "total": 6,
+        "god_id": "aaaaaaaa-0000-0000-0000-000000000001",
+        "purpose": "turn_order_tiebreak"
+      },
+      "created_at": "2026-11-04T00:00:00Z"
+    },
+    {
+      "age": 1,
+      "seq": 7,
+      "type": "dice_rolled",
+      "round": 1,
+      "god_id": "cccccccc-0000-0000-0000-000000000003",
+      "payload": {
+        "dice": [2, 2],
+        "total": 4,
+        "god_id": "cccccccc-0000-0000-0000-000000000003",
+        "purpose": "turn_order_tiebreak"
+      },
+      "created_at": "2026-11-04T00:00:00Z"
+    },
+    {
+      "age": 1,
+      "seq": 8,
       "type": "round_started",
       "round": 1,
       "god_id": null,
@@ -426,42 +454,42 @@
         "round": 1,
         "incomes": [
           {
-            "roll": 5,
+            "roll": 9,
             "bonus": 0,
-            "power": 5,
-            "gained": 5,
+            "power": 9,
+            "gained": 9,
             "god_id": "aaaaaaaa-0000-0000-0000-000000000001"
           },
           {
-            "roll": 10,
+            "roll": 6,
             "bonus": 0,
-            "power": 10,
-            "gained": 10,
+            "power": 6,
+            "gained": 6,
             "god_id": "bbbbbbbb-0000-0000-0000-000000000002"
           },
           {
-            "roll": 7,
+            "roll": 9,
             "bonus": 0,
-            "power": 7,
-            "gained": 7,
+            "power": 9,
+            "gained": 9,
             "god_id": "cccccccc-0000-0000-0000-000000000003"
           }
         ],
-        "deadline": "2026-11-12T01:56:58.026012+00:00",
+        "deadline": "2026-11-12T06:36:57.497867+00:00",
         "turn_order": [
-          "bbbbbbbb-0000-0000-0000-000000000002",
+          "aaaaaaaa-0000-0000-0000-000000000001",
           "cccccccc-0000-0000-0000-000000000003",
-          "aaaaaaaa-0000-0000-0000-000000000001"
+          "bbbbbbbb-0000-0000-0000-000000000002"
         ]
       },
       "created_at": "2026-11-04T00:00:00Z"
     },
     {
       "age": 1,
-      "seq": 7,
+      "seq": 9,
       "type": "action_taken",
       "round": 1,
-      "god_id": "bbbbbbbb-0000-0000-0000-000000000002",
+      "god_id": "aaaaaaaa-0000-0000-0000-000000000001",
       "payload": {
         "cost": 9,
         "hexes": [
@@ -472,55 +500,23 @@
         "power": "shapeLand",
         "choice": "mountains",
         "description": "The Spine of the World rises",
-        "power_after": 31
-      },
-      "created_at": "2026-11-04T00:00:00Z"
-    },
-    {
-      "age": 1,
-      "seq": 8,
-      "type": "action_taken",
-      "round": 1,
-      "god_id": "bbbbbbbb-0000-0000-0000-000000000002",
-      "payload": {
-        "cost": 2,
-        "hexes": [[3, 2]],
-        "power": "shapeClimate",
-        "choice": "snow",
-        "description": "Snow crowns the tallest peak",
-        "power_after": 59
-      },
-      "created_at": "2026-11-04T00:00:00Z"
-    },
-    {
-      "age": 1,
-      "seq": 9,
-      "type": "turn_ended",
-      "round": 1,
-      "god_id": "bbbbbbbb-0000-0000-0000-000000000002",
-      "payload": {
-        "how": "end",
-        "power": 59,
-        "god_id": "bbbbbbbb-0000-0000-0000-000000000002",
-        "deadline": "2026-11-12T01:56:58.045733+00:00",
-        "next_god_id": "cccccccc-0000-0000-0000-000000000003",
-        "low_pool_bonus": 0
+        "power_after": 30
       },
       "created_at": "2026-11-04T00:00:00Z"
     },
     {
       "age": 1,
       "seq": 10,
-      "type": "turn_ended",
+      "type": "action_taken",
       "round": 1,
-      "god_id": "cccccccc-0000-0000-0000-000000000003",
+      "god_id": "aaaaaaaa-0000-0000-0000-000000000001",
       "payload": {
-        "how": "pass",
-        "power": 7,
-        "god_id": "cccccccc-0000-0000-0000-000000000003",
-        "deadline": "2026-11-12T01:56:58.048199+00:00",
-        "next_god_id": "aaaaaaaa-0000-0000-0000-000000000001",
-        "low_pool_bonus": 0
+        "cost": 2,
+        "hexes": [[3, 2]],
+        "power": "shapeClimate",
+        "choice": "snow",
+        "description": "Snow crowns the tallest peak",
+        "power_after": 58
       },
       "created_at": "2026-11-04T00:00:00Z"
     },
@@ -532,8 +528,40 @@
       "god_id": "aaaaaaaa-0000-0000-0000-000000000001",
       "payload": {
         "how": "end",
-        "power": 2,
+        "power": 58,
         "god_id": "aaaaaaaa-0000-0000-0000-000000000001",
+        "deadline": "2026-11-12T06:36:57.526001+00:00",
+        "next_god_id": "cccccccc-0000-0000-0000-000000000003",
+        "low_pool_bonus": 0
+      },
+      "created_at": "2026-11-04T00:00:00Z"
+    },
+    {
+      "age": 1,
+      "seq": 12,
+      "type": "turn_ended",
+      "round": 1,
+      "god_id": "cccccccc-0000-0000-0000-000000000003",
+      "payload": {
+        "how": "pass",
+        "power": 9,
+        "god_id": "cccccccc-0000-0000-0000-000000000003",
+        "deadline": "2026-11-12T06:36:57.529254+00:00",
+        "next_god_id": "bbbbbbbb-0000-0000-0000-000000000002",
+        "low_pool_bonus": 0
+      },
+      "created_at": "2026-11-04T00:00:00Z"
+    },
+    {
+      "age": 1,
+      "seq": 13,
+      "type": "turn_ended",
+      "round": 1,
+      "god_id": "bbbbbbbb-0000-0000-0000-000000000002",
+      "payload": {
+        "how": "end",
+        "power": 2,
+        "god_id": "bbbbbbbb-0000-0000-0000-000000000002",
         "deadline": null,
         "next_god_id": null,
         "low_pool_bonus": 1
@@ -542,13 +570,13 @@
     },
     {
       "age": 1,
-      "seq": 12,
+      "seq": 14,
       "type": "dice_rolled",
       "round": 2,
       "god_id": "aaaaaaaa-0000-0000-0000-000000000001",
       "payload": {
-        "dice": [5, 4],
-        "total": 9,
+        "dice": [3, 4],
+        "total": 7,
         "god_id": "aaaaaaaa-0000-0000-0000-000000000001",
         "purpose": "income"
       },
@@ -556,12 +584,12 @@
     },
     {
       "age": 1,
-      "seq": 13,
+      "seq": 15,
       "type": "dice_rolled",
       "round": 2,
       "god_id": "bbbbbbbb-0000-0000-0000-000000000002",
       "payload": {
-        "dice": [4, 2],
+        "dice": [5, 1],
         "total": 6,
         "god_id": "bbbbbbbb-0000-0000-0000-000000000002",
         "purpose": "income"
@@ -570,13 +598,13 @@
     },
     {
       "age": 1,
-      "seq": 14,
+      "seq": 16,
       "type": "dice_rolled",
       "round": 2,
       "god_id": "cccccccc-0000-0000-0000-000000000003",
       "payload": {
-        "dice": [2, 6],
-        "total": 8,
+        "dice": [1, 4],
+        "total": 5,
         "god_id": "cccccccc-0000-0000-0000-000000000003",
         "purpose": "income"
       },
@@ -584,7 +612,7 @@
     },
     {
       "age": 1,
-      "seq": 15,
+      "seq": 17,
       "type": "round_started",
       "round": 2,
       "god_id": null,
@@ -594,39 +622,39 @@
         "round": 2,
         "incomes": [
           {
-            "roll": 9,
-            "bonus": 1,
-            "power": 12,
-            "gained": 10,
+            "roll": 7,
+            "bonus": 0,
+            "power": 65,
+            "gained": 7,
             "god_id": "aaaaaaaa-0000-0000-0000-000000000001"
           },
           {
             "roll": 6,
-            "bonus": 0,
-            "power": 65,
-            "gained": 6,
+            "bonus": 1,
+            "power": 9,
+            "gained": 7,
             "god_id": "bbbbbbbb-0000-0000-0000-000000000002"
           },
           {
-            "roll": 8,
+            "roll": 5,
             "bonus": 0,
-            "power": 15,
-            "gained": 8,
+            "power": 14,
+            "gained": 5,
             "god_id": "cccccccc-0000-0000-0000-000000000003"
           }
         ],
-        "deadline": "2026-11-12T01:56:58.050038+00:00",
+        "deadline": "2026-11-12T06:36:57.532037+00:00",
         "turn_order": [
           "aaaaaaaa-0000-0000-0000-000000000001",
-          "cccccccc-0000-0000-0000-000000000003",
-          "bbbbbbbb-0000-0000-0000-000000000002"
+          "bbbbbbbb-0000-0000-0000-000000000002",
+          "cccccccc-0000-0000-0000-000000000003"
         ]
       },
       "created_at": "2026-11-04T00:00:00Z"
     },
     {
       "age": 1,
-      "seq": 16,
+      "seq": 18,
       "type": "action_taken",
       "round": 2,
       "god_id": "aaaaaaaa-0000-0000-0000-000000000001",
@@ -639,38 +667,90 @@
         "power": "shapeLand",
         "choice": "forest",
         "description": "Old woods spread",
-        "power_after": 36
+        "power_after": 89
       },
       "created_at": "2026-11-04T00:00:00Z"
     },
     {
       "age": 1,
-      "seq": 17,
+      "seq": 19,
+      "type": "action_taken",
+      "round": 2,
+      "god_id": "aaaaaaaa-0000-0000-0000-000000000001",
+      "payload": {
+        "cost": 22,
+        "race": {
+          "id": "b6418bb0-55f0-4b0a-ab87-82fe846cbbda",
+          "hex": [4, 4],
+          "name": "Dwarves",
+          "alignment": 1,
+          "appearance": "Short and bearded",
+          "description": "Stout folk of the deep halls"
+        },
+        "hexes": [[4, 4]],
+        "order": {
+          "id": "416d98e7-bb1e-4ee8-8ce8-f4fd79472c72",
+          "name": "Faithful of Solara"
+        },
+        "power": "createRace",
+        "choice": "Dwarves",
+        "description": "Stout folk of the deep halls",
+        "power_after": 97
+      },
+      "created_at": "2026-11-04T00:00:00Z"
+    },
+    {
+      "age": 1,
+      "seq": 20,
+      "type": "action_taken",
+      "round": 2,
+      "god_id": "aaaaaaaa-0000-0000-0000-000000000001",
+      "payload": {
+        "city": {
+          "id": "5b6f26a7-16a8-4ea0-bd1d-6aa7c85b951a",
+          "hex": [5, 4],
+          "name": "Karak",
+          "race_id": "b6418bb0-55f0-4b0a-ab87-82fe846cbbda",
+          "alignment": 1
+        },
+        "cost": 8,
+        "hexes": [[5, 4]],
+        "power": "commandRace",
+        "choice": "Karak",
+        "intent": "foundCity",
+        "description": "A hall is carved into the hill",
+        "power_after": 119
+      },
+      "created_at": "2026-11-04T00:00:00Z"
+    },
+    {
+      "age": 1,
+      "seq": 21,
       "type": "turn_ended",
       "round": 2,
       "god_id": "aaaaaaaa-0000-0000-0000-000000000001",
       "payload": {
         "how": "end",
-        "power": 36,
+        "power": 119,
         "god_id": "aaaaaaaa-0000-0000-0000-000000000001",
-        "deadline": "2026-11-12T01:56:58.055737+00:00",
-        "next_god_id": "cccccccc-0000-0000-0000-000000000003",
+        "deadline": "2026-11-12T06:36:57.549963+00:00",
+        "next_god_id": "bbbbbbbb-0000-0000-0000-000000000002",
         "low_pool_bonus": 0
       },
       "created_at": "2026-11-04T00:00:00Z"
     },
     {
       "age": 1,
-      "seq": 18,
+      "seq": 22,
       "type": "turn_ended",
       "round": 2,
-      "god_id": "cccccccc-0000-0000-0000-000000000003",
+      "god_id": "bbbbbbbb-0000-0000-0000-000000000002",
       "payload": {
         "how": "timeout",
-        "power": 15,
-        "god_id": "cccccccc-0000-0000-0000-000000000003",
-        "deadline": "2026-11-12T01:56:58.058153+00:00",
-        "next_god_id": "bbbbbbbb-0000-0000-0000-000000000002",
+        "power": 9,
+        "god_id": "bbbbbbbb-0000-0000-0000-000000000002",
+        "deadline": "2026-11-12T06:36:57.553319+00:00",
+        "next_god_id": "cccccccc-0000-0000-0000-000000000003",
         "low_pool_bonus": 0
       },
       "created_at": "2026-11-04T00:00:00Z"
@@ -678,16 +758,48 @@
   ],
   "powers": {
     "aaaaaaaa-0000-0000-0000-000000000001": {
-      "power": 36,
+      "power": 119,
       "lowPoolBonus": 0
     },
     "bbbbbbbb-0000-0000-0000-000000000002": {
-      "power": 65,
+      "power": 9,
       "lowPoolBonus": 0
     },
     "cccccccc-0000-0000-0000-000000000003": {
-      "power": 15,
+      "power": 14,
       "lowPoolBonus": 0
     }
-  }
+  },
+  "entities": [
+    {
+      "id": "b6418bb0-55f0-4b0a-ab87-82fe846cbbda",
+      "kind": "race",
+      "name": "Dwarves",
+      "hex_x": 4,
+      "hex_y": 4,
+      "god_id": "aaaaaaaa-0000-0000-0000-000000000001",
+      "race_id": null,
+      "alignment": 1
+    },
+    {
+      "id": "416d98e7-bb1e-4ee8-8ce8-f4fd79472c72",
+      "kind": "order",
+      "name": "Faithful of Solara",
+      "hex_x": null,
+      "hex_y": null,
+      "god_id": "aaaaaaaa-0000-0000-0000-000000000001",
+      "race_id": "b6418bb0-55f0-4b0a-ab87-82fe846cbbda",
+      "alignment": 1
+    },
+    {
+      "id": "5b6f26a7-16a8-4ea0-bd1d-6aa7c85b951a",
+      "kind": "city",
+      "name": "Karak",
+      "hex_x": 5,
+      "hex_y": 4,
+      "god_id": "aaaaaaaa-0000-0000-0000-000000000001",
+      "race_id": "b6418bb0-55f0-4b0a-ab87-82fe846cbbda",
+      "alignment": 1
+    }
+  ]
 }

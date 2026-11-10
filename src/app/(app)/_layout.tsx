@@ -23,6 +23,7 @@ export default function AppLayout() {
       <Stack.Screen name="world/[id]/god" options={{ title: 'Your god', presentation: 'modal' }} />
       <Stack.Screen name="world/[id]/act" options={{ title: 'Shape the world' }} />
       <Stack.Screen name="world/[id]/landmass" options={{ title: 'Starting landmass' }} />
+      <Stack.Screen name="world/[id]/atlas" options={{ title: 'Atlas' }} />
     </Stack>
   );
 }

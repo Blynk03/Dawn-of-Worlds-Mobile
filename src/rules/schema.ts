@@ -62,6 +62,8 @@ export const RulesetSchema = z
         height: z.number().int().min(8).max(64),
       }),
       terrains: z.array(z.string().regex(/^[a-z]+$/)).min(2),
+      /** Terrains that are water: races and cities can't be placed there. */
+      water: z.array(z.string().regex(/^[a-z]+$/)),
       climates: z.array(z.string().regex(/^[a-z]+$/)).min(1),
     }),
     powers: z.array(PowerSchema).min(1),

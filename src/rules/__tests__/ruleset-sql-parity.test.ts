@@ -28,7 +28,18 @@ describe('server ruleset matches the app ruleset', () => {
     );
     expect(block).not.toBeNull();
     const server = JSON.parse(block![1]);
-    expect(server.map).toEqual(classic.map);
+    // The map options were restated (with water terrains added) by the races migration.
+    const sql3 = readFileSync(
+      join(__dirname, '../../../supabase/migrations/20261111000000_races_and_cities.sql'),
+      'utf8',
+    );
+    const races = sql3.match(
+      /-- ruleset:classic-races:begin\s*'([\s\S]*?)'::jsonb\s*-- ruleset:classic-races:end/,
+    );
+    expect(races).not.toBeNull();
+    expect(JSON.parse(races![1]).map).toEqual(classic.map);
+    const { water: _water, ...mapBeforeWater } = classic.map;
+    expect(server.map).toEqual(mapBeforeWater);
     expect(server.powers).toEqual(
       classic.powers.map((p) => ({
         id: p.id,

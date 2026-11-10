@@ -66,6 +66,50 @@ export async function takeAction(
   if (error) throw new Error(friendlyError(error));
 }
 
+export type NewRace = {
+  name: string;
+  description: string;
+  appearance: string;
+  /** +1 good, 0 neutral, -1 evil. */
+  alignment: -1 | 0 | 1;
+  hex: { x: number; y: number };
+};
+
+/** DOW-34: Create Race on its homeland hex. Returns the new race's id. */
+export async function createRace(worldId: string, race: NewRace): Promise<string> {
+  const { data, error } = await client().rpc('create_race', {
+    target_world: worldId,
+    race_name: race.name,
+    race_description: race.description,
+    race_appearance: race.appearance,
+    race_alignment: race.alignment,
+    hex_x: race.hex.x,
+    hex_y: race.hex.y,
+  });
+  if (error) throw new Error(friendlyError(error));
+  return data;
+}
+
+/** DOW-35: Command Race to found a city. Returns the new city's id. */
+export async function foundCity(
+  worldId: string,
+  raceId: string,
+  name: string,
+  hex: { x: number; y: number },
+  description: string,
+): Promise<string> {
+  const { data, error } = await client().rpc('found_city', {
+    target_world: worldId,
+    race: raceId,
+    city_name: name,
+    hex_x: hex.x,
+    hex_y: hex.y,
+    description,
+  });
+  if (error) throw new Error(friendlyError(error));
+  return data;
+}
+
 let channelCounter = 0;
 
 /**
