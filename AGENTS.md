@@ -50,3 +50,5 @@ Docs: https://docs.expo.dev/eas/index.md
 - Database changes go in a new file in `supabase/migrations/` with RLS enabled, plus checks in `supabase/tests/rls_test.sql`. Run `./scripts/test-db.sh`.
 - Signed-in screens live under `src/app/(app)/` (protected by the root layout). Public routes (`sign-in`, `auth/callback`, `join/[code]`) live at the top level.
 - Supabase calls go through `src/worlds/api.ts`-style modules that throw player-friendly errors (`friendlyError`); keep screens free of raw Supabase queries.
+- The game is server-authoritative: dice, power, turn order and turns live in Postgres functions (`supabase/migrations/20261104000000_turns_and_rounds.sql`). Every change is appended to `world_events`; the app shows the game by projecting those events (`src/game/project.ts`), which only reads results the server wrote. The server's rules copy (`rulesets` table) is checked against `src/rules/rulesets/classic.json` by a test.
+- After changing game functions, regenerate the projection fixture: `./scripts/make-game-fixture.sh > src/game/__tests__/fixtures/server-game.json`.

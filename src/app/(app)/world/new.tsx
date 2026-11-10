@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { ScrollView, StyleSheet, Switch, View } from 'react-native';
 
 import { Button, TextField } from '@/components/form';
-import { Card, ErrorMessage } from '@/components/game-ui';
+import { Card, Chip, ErrorMessage } from '@/components/game-ui';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
@@ -11,12 +11,21 @@ import { useTheme } from '@/hooks/use-theme';
 import { createWorld } from '@/worlds/api';
 import { validateWorldName } from '@/worlds/validation';
 
+const TURN_LIMITS: { label: string; hours: number | null }[] = [
+  { label: 'No limit', hours: null },
+  { label: '24 hours', hours: 24 },
+  { label: '48 hours', hours: 48 },
+  { label: '3 days', hours: 72 },
+  { label: '1 week', hours: 168 },
+];
+
 /** DOW-22: create a world. The creator becomes its host. */
 export default function NewWorldScreen() {
   const router = useRouter();
   const theme = useTheme();
   const [name, setName] = useState('');
   const [isGm, setIsGm] = useState(false);
+  const [turnLimit, setTurnLimit] = useState<number | null>(48);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const nameProblem = validateWorldName(name);
@@ -25,7 +34,7 @@ export default function NewWorldScreen() {
     setBusy(true);
     setError(null);
     try {
-      const world = await createWorld(name, isGm);
+      const world = await createWorld(name, isGm, turnLimit);
       router.replace(`/world/${world.id}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -67,6 +76,23 @@ export default function NewWorldScreen() {
             />
           </View>
         </Card>
+        <Card>
+          <ThemedText type="smallBold">Turn time limit</ThemedText>
+          <ThemedText type="small" themeColor="textSecondary">
+            If someone doesn&apos;t take their turn in time, any player can skip it so the game
+            keeps moving.
+          </ThemedText>
+          <View style={styles.chips}>
+            {TURN_LIMITS.map((option) => (
+              <Chip
+                key={option.label}
+                label={option.label}
+                selected={turnLimit === option.hours}
+                onPress={() => setTurnLimit(option.hours)}
+              />
+            ))}
+          </View>
+        </Card>
         <Button title="Create world" onPress={create} disabled={!!nameProblem} busy={busy} />
         <ErrorMessage message={error} />
       </ScrollView>
@@ -85,4 +111,5 @@ const styles = StyleSheet.create({
   },
   row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three },
   rowText: { flex: 1, gap: Spacing.half },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
 });
