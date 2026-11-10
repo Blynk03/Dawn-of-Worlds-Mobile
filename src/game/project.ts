@@ -34,6 +34,28 @@ export type TurnRecord = {
   at: string;
 };
 
+export type WorldMapView = {
+  width: number;
+  height: number;
+  /** Row by row: index = y * width + x. */
+  terrain: string[];
+  climate: string[];
+};
+
+/** One thing a god did to a hex (DOW-33). */
+export type HexChange = {
+  seq: number;
+  age: number;
+  round: number;
+  godId: string | null;
+  power: string;
+  choice: string;
+  description: string;
+};
+
+/** An action a god took (Shape Land, Shape Climate, …). */
+export type ActionRecord = HexChange & { cost: number; hexes: [number, number][] };
+
 export type GameView = {
   started: boolean;
   age: number;
@@ -50,6 +72,12 @@ export type GameView = {
   roundTiebreaks: DiceRoll[];
   /** Turns taken so far this round. */
   turnsThisRound: TurnRecord[];
+  /** null until the map is logged at the start of the game. */
+  map: WorldMapView | null;
+  /** Every action so far, oldest first. */
+  actions: ActionRecord[];
+  /** For each hex index, the seqs of actions that changed it (oldest first). */
+  hexHistory: Record<number, number[]>;
   /** seq of the current round's round_started event. */
   roundStartSeq: number;
   /** Highest seq applied, so new events can be applied incrementally. */
@@ -68,6 +96,9 @@ export const EMPTY_GAME: GameView = {
   roundIncomes: [],
   roundTiebreaks: [],
   turnsThisRound: [],
+  map: null,
+  actions: [],
+  hexHistory: {},
   roundStartSeq: 0,
   lastSeq: 0,
 };
@@ -168,6 +199,61 @@ export function applyEvent(view: GameView, event: GameEvent): GameView {
       return next;
     }
 
+    case 'map_initialized': {
+      const width = num(p.width);
+      const height = num(p.height);
+      const strings = (v: unknown) => (Array.isArray(v) ? v.map((x) => String(x)) : []);
+      next.map = { width, height, terrain: strings(p.terrain), climate: strings(p.climate) };
+      next.hexHistory = {};
+      return next;
+    }
+
+    case 'action_taken': {
+      const hexes: [number, number][] = (Array.isArray(p.hexes) ? p.hexes : [])
+        .filter((h): h is unknown[] => Array.isArray(h) && h.length === 2)
+        .map((h) => [num(h[0]), num(h[1])]);
+      const action: ActionRecord = {
+        seq: event.seq,
+        age: event.age,
+        round: event.round,
+        godId: event.god_id,
+        power: str(p.power) ?? '',
+        choice: str(p.choice) ?? '',
+        description: str(p.description) ?? '',
+        cost: num(p.cost),
+        hexes,
+      };
+      next.actions = [...view.actions, action];
+      if (event.god_id) {
+        next.powers = {
+          ...view.powers,
+          [event.god_id]: {
+            power: num(p.power_after, view.powers[event.god_id]?.power ?? 0),
+            lowPoolBonus: view.powers[event.god_id]?.lowPoolBonus ?? 0,
+          },
+        };
+      }
+      if (view.map) {
+        const layer =
+          action.power === 'shapeLand'
+            ? 'terrain'
+            : action.power === 'shapeClimate'
+              ? 'climate'
+              : null;
+        const map = { ...view.map, terrain: [...view.map.terrain], climate: [...view.map.climate] };
+        const history = { ...view.hexHistory };
+        for (const [x, y] of hexes) {
+          if (x < 0 || y < 0 || x >= map.width || y >= map.height) continue;
+          const index = y * map.width + x;
+          if (layer) map[layer][index] = action.choice;
+          history[index] = [...(history[index] ?? []), event.seq];
+        }
+        next.map = map;
+        next.hexHistory = history;
+      }
+      return next;
+    }
+
     default:
       // Unknown event types (from newer app versions) are skipped, not fatal.
       return next;
@@ -186,6 +272,12 @@ const AGE_NAMES = ['First Age', 'Second Age', 'Third Age'];
 
 export function ageName(age: number): string {
   return AGE_NAMES[age - 1] ?? `Age ${age}`;
+}
+
+/** The actions that changed a hex, oldest first. */
+export function hexChanges(view: GameView, index: number): ActionRecord[] {
+  const seqs = new Set(view.hexHistory[index] ?? []);
+  return view.actions.filter((a) => seqs.has(a.seq));
 }
 
 /** e.g. "Ends in 23h", "Ends in 12m", or "Time's up". */

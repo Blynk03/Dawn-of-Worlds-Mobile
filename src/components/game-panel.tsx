@@ -16,11 +16,28 @@ type Props = {
   gods: God[];
   members: LobbyMember[];
   myId: string;
+  /** Opens the action screen. Without it, the Act button is hidden. */
+  onAct?: () => void;
 };
 
+export type GameState = ReturnType<typeof useGame>;
+
+/** The game in play, loading its own state. */
+export function GamePanel(props: Props) {
+  const game = useGame(props.worldId, true);
+  return <GamePanelView {...props} game={game} />;
+}
+
 /** The game in play: round, year, whose turn it is, everyone's power, and your turn controls. */
-export function GamePanel({ worldId, gods, members, myId }: Props) {
-  const { view, error, loaded, refresh } = useGame(worldId, true);
+export function GamePanelView({
+  worldId,
+  gods,
+  members,
+  myId,
+  onAct,
+  game,
+}: Props & { game: GameState }) {
+  const { view, error, loaded, refresh } = game;
   const now = useNow();
   const [busy, setBusy] = useState<'end' | 'pass' | 'skip' | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);

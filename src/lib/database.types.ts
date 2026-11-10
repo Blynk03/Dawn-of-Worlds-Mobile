@@ -193,6 +193,19 @@ export type Database = {
         Update: never;
         Relationships: [];
       };
+      world_map: {
+        Row: {
+          world_id: string;
+          width: number;
+          height: number;
+          terrain: string[];
+          climate: string[];
+          updated_at: string;
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
       rulesets: {
         Row: { id: string; config: Json };
         Insert: never;
@@ -211,6 +224,20 @@ export type Database = {
       generate_invite_code: { Args: Record<PropertyKey, never>; Returns: string };
       end_turn: { Args: { target_world: string; pass?: boolean }; Returns: undefined };
       skip_timed_out_turn: { Args: { target_world: string }; Returns: undefined };
+      set_initial_map: {
+        Args: { target_world: string; map_width: number; map_height: number; terrain: string[] };
+        Returns: undefined;
+      };
+      take_action: {
+        Args: {
+          target_world: string;
+          power_id: string;
+          hexes: Json;
+          choice: string;
+          description: string;
+        };
+        Returns: undefined;
+      };
     };
     Enums: { [_ in never]: never };
     CompositeTypes: { [_ in never]: never };
@@ -223,3 +250,4 @@ export type WorldMember = Database['public']['Tables']['world_members']['Row'];
 export type God = Database['public']['Tables']['gods']['Row'];
 export type WorldState = Database['public']['Tables']['world_state']['Row'];
 export type WorldEventRow = Database['public']['Tables']['world_events']['Row'];
+export type WorldMapRow = Database['public']['Tables']['world_map']['Row'];

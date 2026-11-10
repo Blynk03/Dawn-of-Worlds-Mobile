@@ -25,6 +25,19 @@ begin
   reset role;
 end $$;
 
+-- Takes an action as whoever is active (with enough power to afford it).
+create function pg_temp.act(w uuid, p text, hexes jsonb, choice text, d text) returns void language plpgsql as $$
+declare g uuid; u uuid;
+begin
+  reset role;
+  select s.turn_order[s.active_position] into g from public.world_state s where s.world_id = w;
+  select user_id into u from public.gods where id = g;
+  update public.god_power set power = power + 30 where god_id = g;
+  perform pg_temp.act_as(u);
+  perform public.take_action(w, p, hexes, choice, d);
+  reset role;
+end $$;
+
 insert into auth.users (id, email) values
   ('00000000-0000-0000-0000-0000000000a1', 'a@example.com'),
   ('00000000-0000-0000-0000-0000000000b2', 'b@example.com'),
@@ -46,13 +59,22 @@ select public.join_world(current_setting('fixture.code'));
 insert into public.gods (id, world_id, name, spheres, color, sigil)
 values ('cccccccc-0000-0000-0000-000000000003', '11111111-1111-1111-1111-111111111111', 'Thalassa', '{Sea}', '#0D9488', '⚓');
 select pg_temp.act_as('00000000-0000-0000-0000-0000000000a1');
+-- A small, fixed starting landmass (10x8): ocean border, grassland inside.
+select public.set_initial_map('11111111-1111-1111-1111-111111111111', 10, 8,
+  array(select case when x in (0, 9) or y in (0, 7) then 'ocean' else 'grassland' end
+        from generate_series(0, 7) y, generate_series(0, 9) x order by y, x));
 select public.start_world('11111111-1111-1111-1111-111111111111');
+
+-- Round 1, first god: raise mountains, then bring snow to one of them.
+select pg_temp.act('11111111-1111-1111-1111-111111111111', 'shapeLand', '[[2,2],[3,2],[4,2]]', 'mountains', 'The Spine of the World rises');
+select pg_temp.act('11111111-1111-1111-1111-111111111111', 'shapeClimate', '[[3,2]]', 'snow', 'Snow crowns the tallest peak');
 
 -- Round 1: end, pass, end (the last with a low pool so a bonus is earned).
 select pg_temp.play('11111111-1111-1111-1111-111111111111', false, false);
 select pg_temp.play('11111111-1111-1111-1111-111111111111', true, false);
 select pg_temp.play('11111111-1111-1111-1111-111111111111', false, true);
--- Round 2: one turn taken, then a timeout.
+-- Round 2: a forest on the same hex as before, one turn taken, then a timeout.
+select pg_temp.act('11111111-1111-1111-1111-111111111111', 'shapeLand', '[[2,2],[5,5]]', 'forest', 'Old woods spread');
 select pg_temp.play('11111111-1111-1111-1111-111111111111', false, false);
 reset role;
 update public.world_state set turn_deadline = now() - interval '1 minute'
@@ -72,5 +94,7 @@ select jsonb_pretty(jsonb_build_object(
   'state', (select to_jsonb(s) - 'world_id' - 'turn_started_at' from public.world_state s
     where world_id = '11111111-1111-1111-1111-111111111111'),
   'powers', (select jsonb_object_agg(god_id, jsonb_build_object('power', power, 'lowPoolBonus', low_pool_bonus))
-    from public.god_power where world_id = '11111111-1111-1111-1111-111111111111')
+    from public.god_power where world_id = '11111111-1111-1111-1111-111111111111'),
+  'map', (select jsonb_build_object('width', width, 'height', height, 'terrain', to_jsonb(terrain), 'climate', to_jsonb(climate))
+    from public.world_map where world_id = '11111111-1111-1111-1111-111111111111')
 ));

@@ -4,8 +4,9 @@ import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, View } from 
 
 import { useAuth } from '@/auth/auth-provider';
 import { Button } from '@/components/form';
-import { GamePanel } from '@/components/game-panel';
+import { ActiveWorld } from '@/components/active-world';
 import { Card, ErrorMessage, GodBadge, SectionLabel } from '@/components/game-ui';
+import { HexMap } from '@/components/hex-map';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
@@ -76,30 +77,64 @@ export default function WorldScreen() {
     );
   };
 
+  if (!inLobby) {
+    return (
+      <ThemedView style={styles.fill}>
+        <Stack.Screen options={{ title: world.name }} />
+        <ActiveWorld worldId={world.id} gods={gods} members={members} myId={myId} />
+      </ThemedView>
+    );
+  }
+
   return (
     <ThemedView style={styles.fill}>
       <Stack.Screen options={{ title: world.name }} />
       <ScrollView
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={loading} onRefresh={refresh} />}>
-        {inLobby ? (
-          <Card>
-            <SectionLabel>Invite friends</SectionLabel>
-            <ThemedText type="subtitle" selectable accessibilityLabel="Invite code">
-              {formatInviteCode(world.invite_code)}
-            </ThemedText>
-            <ThemedText type="small" themeColor="textSecondary">
-              Friends enter this code on their Worlds screen, or open the link you send them.
-            </ThemedText>
-            <Button title="Share invite" variant="secondary" onPress={share} />
-            {shareNote ? <ThemedText type="small">{shareNote}</ThemedText> : null}
-          </Card>
-        ) : (
-          <GamePanel worldId={world.id} gods={gods} members={members} myId={myId} />
-        )}
+        <Card>
+          <SectionLabel>Invite friends</SectionLabel>
+          <ThemedText type="subtitle" selectable accessibilityLabel="Invite code">
+            {formatInviteCode(world.invite_code)}
+          </ThemedText>
+          <ThemedText type="small" themeColor="textSecondary">
+            Friends enter this code on their Worlds screen, or open the link you send them.
+          </ThemedText>
+          <Button title="Share invite" variant="secondary" onPress={share} />
+          {shareNote ? <ThemedText type="small">{shareNote}</ThemedText> : null}
+        </Card>
 
-        {inLobby ? <SectionLabel>Players ({members.length}/8)</SectionLabel> : null}
-        {(inLobby ? members : []).map((member) => (
+        <Card>
+          <SectionLabel>Starting landmass</SectionLabel>
+          {lobby.map ? (
+            <View style={styles.mapPreview}>
+              <HexMap
+                map={{
+                  width: lobby.map.width,
+                  height: lobby.map.height,
+                  terrain: lobby.map.terrain,
+                  climate: lobby.map.climate,
+                }}
+              />
+            </View>
+          ) : (
+            <ThemedText type="small" themeColor="textSecondary">
+              {isHost
+                ? 'Sketch the land and seas your gods will start with, or leave it and a random one is made when the game starts.'
+                : 'The host can sketch the starting land and seas. Otherwise a random one is made when the game starts.'}
+            </ThemedText>
+          )}
+          {isHost ? (
+            <Button
+              title={lobby.map ? 'Edit the starting landmass' : 'Draw the starting landmass'}
+              variant="secondary"
+              onPress={() => router.push(`/world/${world.id}/landmass`)}
+            />
+          ) : null}
+        </Card>
+
+        <SectionLabel>Players ({members.length}/8)</SectionLabel>
+        {members.map((member) => (
           <MemberRow
             key={member.user_id}
             member={member}
@@ -237,6 +272,7 @@ const styles = StyleSheet.create({
     width: '100%',
     alignSelf: 'center',
   },
+  mapPreview: { height: 240, borderRadius: Spacing.two, overflow: 'hidden' },
   memberRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three },
   memberText: { flex: 1, gap: Spacing.half },
 });

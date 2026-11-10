@@ -219,7 +219,7 @@ select pg_temp.check(
 
 -- Low-pool bonus: ending a turn with 5 or fewer points earns +1 next round.
 select set_config('test.poor', pg_temp.active_god(current_setting('test.w')::uuid)::text, false);
-update public.god_power set power = 3 where god_id = current_setting('test.poor')::uuid;
+update public.god_power set power = 3, low_pool_bonus = 0 where god_id = current_setting('test.poor')::uuid;
 select pg_temp.play_turn(current_setting('test.w')::uuid);
 select pg_temp.check(
   (select low_pool_bonus = 1 from public.god_power where god_id = current_setting('test.poor')::uuid),
