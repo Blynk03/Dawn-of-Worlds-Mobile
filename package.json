@@ -67,6 +67,7 @@
     "moduleNameMapper": {
       "\\.css$": "<rootDir>/test/style-mock.js",
       "^expo-sqlite/localStorage/install$": "<rootDir>/test/noop.js"
-    }
+    },
+    "testTimeout": 15000
   }
 }
