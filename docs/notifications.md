@@ -24,17 +24,23 @@ iPhone/iPad needs the Apple developer account (DOW-77); web players see the "new
 
 ## One-time setup
 
-1. **Expo project:** create a project named `dawn-of-worlds` at expo.dev. Its **Project ID**
-   goes in `app.json` → `expo.extra.eas.projectId`.
-2. **Firebase:** create a project, add an Android app with package `com.blynk03.dawnofworlds`,
-   download `google-services.json`, and save its contents as the GitHub Actions secret
-   **`GOOGLE_SERVICES_JSON`**. The Android build writes it into the app. (It is not committed;
-   the repo is public.)
-3. **Expo ↔ Firebase:** in Firebase → Project settings → Service accounts, generate a private
-   key, and upload it on expo.dev → project → Credentials → Android
-   (`com.blynk03.dawnofworlds`) → _FCM V1 service account key_. This key is secret: don't
-   commit or share it.
-4. **Supabase:** run the migration. It enables the `pg_net` and `pg_cron` extensions.
+1. **Expo project:** `dawn-of-worlds` on expo.dev. Its Project ID is in `app.json` →
+   `expo.extra.eas.projectId`.
+2. **Firebase:** a project with an Android app for package `com.blynk03.dawnofworlds`. The
+   contents of its `google-services.json` are the GitHub Actions secret **`GOOGLE_SERVICES_JSON`**;
+   builds write the file into the app. (It is not committed; the repo is public.)
+3. **Expo access token:** expo.dev → Account settings → Access tokens → create one, and save it
+   as the GitHub Actions secret **`EXPO_TOKEN`**.
+4. **Android signing key:** run the **Set up Android signing (EAS)** workflow once (Actions tab →
+   Run workflow). Expo creates and keeps the app's keystore and starts the first cloud build.
+   This is needed because expo.dev won't take the next step without a keystore, and Expo only
+   generates one when someone confirms it.
+5. **Expo ↔ Firebase:** in Firebase → Project settings → Service accounts, generate a private
+   key. On expo.dev → project → Credentials, open the Android application identifier
+   (`com.blynk03.dawnofworlds`) and upload it as the **FCM V1 service account key**. This key is
+   secret: don't commit or share it, and delete the downloaded file afterwards.
+6. **Supabase:** run the notifications migration. It enables the `pg_net` and `pg_cron`
+   extensions.
 
 ## Troubleshooting
 
