@@ -24,6 +24,7 @@ export default function AppLayout() {
       <Stack.Screen name="world/[id]/act" options={{ title: 'Shape the world' }} />
       <Stack.Screen name="world/[id]/landmass" options={{ title: 'Starting landmass' }} />
       <Stack.Screen name="world/[id]/atlas" options={{ title: 'Atlas' }} />
+      <Stack.Screen name="world/[id]/chronicle" options={{ title: 'Chronicle' }} />
     </Stack>
   );
 }

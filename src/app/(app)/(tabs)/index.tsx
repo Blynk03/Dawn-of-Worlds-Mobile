@@ -5,13 +5,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useAuth } from '@/auth/auth-provider';
 import { Button, TextField } from '@/components/form';
-import { Card, ErrorMessage, GodBadge } from '@/components/game-ui';
+import { Card, ErrorMessage, GodBadge, UnreadBadge } from '@/components/game-ui';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import type { WorldSummary } from '@/worlds/api';
 import { joinWorld } from '@/worlds/api';
 import { useMyWorlds } from '@/worlds/hooks';
+import { useUnreadCounts } from '@/chronicle/hooks';
 import { isValidInviteCode, takePendingInvite } from '@/worlds/invite';
 import { sortWorldsForHome, worldAction, worldStatusLabel } from '@/worlds/summaries';
 
@@ -21,6 +22,7 @@ export default function WorldsScreen() {
   const { session } = useAuth();
   const myId = session?.user.id ?? '';
   const { data: worlds, error, loading, refresh } = useMyWorlds();
+  const unread = useUnreadCounts();
 
   // Continue an invite link that was opened before signing in.
   useEffect(() => {
@@ -59,6 +61,7 @@ export default function WorldsScreen() {
               key={world.id}
               world={world}
               myId={myId}
+              unread={unread[world.id] ?? 0}
               onPress={() => router.push(`/world/${world.id}`)}
             />
           ))}
@@ -71,10 +74,12 @@ export default function WorldsScreen() {
 function WorldCard({
   world,
   myId,
+  unread,
   onPress,
 }: {
   world: WorldSummary;
   myId: string;
+  unread: number;
   onPress: () => void;
 }) {
   const myGod = world.gods.find((g) => g.user_id === myId);
@@ -100,6 +105,7 @@ function WorldCard({
             </View>
           ) : null}
         </View>
+        <UnreadBadge count={unread} />
       </Card>
     </Pressable>
   );

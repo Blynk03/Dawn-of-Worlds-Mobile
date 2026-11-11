@@ -206,6 +206,32 @@ export type Database = {
         Update: never;
         Relationships: [];
       };
+      action_comments: {
+        Row: {
+          id: string;
+          world_id: string;
+          event_seq: number;
+          parent_id: string | null;
+          user_id: string;
+          body: string;
+          created_at: string;
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      action_reactions: {
+        Row: {
+          world_id: string;
+          event_seq: number;
+          user_id: string;
+          emoji: string;
+          created_at: string;
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
       rulesets: {
         Row: { id: string; config: Json };
         Insert: never;
@@ -224,6 +250,20 @@ export type Database = {
       generate_invite_code: { Args: Record<PropertyKey, never>; Returns: string };
       end_turn: { Args: { target_world: string; pass?: boolean }; Returns: undefined };
       skip_timed_out_turn: { Args: { target_world: string }; Returns: undefined };
+      add_comment: {
+        Args: { target_world: string; action_seq: number; body: string; reply_to?: string | null };
+        Returns: string;
+      };
+      delete_comment: { Args: { comment: string }; Returns: undefined };
+      toggle_reaction: {
+        Args: { target_world: string; action_seq: number; emoji: string };
+        Returns: boolean;
+      };
+      mark_world_read: { Args: { target_world: string }; Returns: undefined };
+      unread_counts: {
+        Args: Record<PropertyKey, never>;
+        Returns: { world_id: string; unread: number }[];
+      };
       set_initial_map: {
         Args: { target_world: string; map_width: number; map_height: number; terrain: string[] };
         Returns: undefined;
@@ -274,3 +314,5 @@ export type God = Database['public']['Tables']['gods']['Row'];
 export type WorldState = Database['public']['Tables']['world_state']['Row'];
 export type WorldEventRow = Database['public']['Tables']['world_events']['Row'];
 export type WorldMapRow = Database['public']['Tables']['world_map']['Row'];
+export type CommentRow = Database['public']['Tables']['action_comments']['Row'];
+export type ReactionRow = Database['public']['Tables']['action_reactions']['Row'];

@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
 
 import { ActiveWorld } from '@/components/active-world';
+import * as socialApi from '@/chronicle/social';
 import * as gameApi from '@/game/api';
 import fixture from '@/game/__tests__/fixtures/server-game.json';
 import { type GameEvent, projectWorld } from '@/game/project';
@@ -16,7 +17,12 @@ jest.mock('expo-router', () => {
 });
 jest.mock('@/components/hex-map', () => jest.requireActual('../../test/hex-map-mock'));
 jest.mock('@/game/api');
+jest.mock('@/chronicle/social', () => ({
+  ...jest.requireActual('@/chronicle/social'),
+  loadUnreadCounts: jest.fn(),
+}));
 const game = jest.mocked(gameApi);
+const social = jest.mocked(socialApi);
 
 // The real server-played game: a map, the Dwarves and Karak, and it's someone's turn.
 const view = projectWorld(fixture.events as GameEvent[]);
@@ -48,6 +54,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   game.loadGameEvents.mockResolvedValue(fixture.events as GameEvent[]);
   game.subscribeToGameEvents.mockReturnValue(() => {});
+  social.loadUnreadCounts.mockResolvedValue({});
 });
 
 describe('A world in play', () => {
@@ -63,5 +70,19 @@ describe('A world in play', () => {
     expect(screen.getByText('marker city Karak at 45')).toBeTruthy();
     await fireEvent.press(screen.getByRole('button', { name: 'Atlas · 1 race, 1 city' }));
     expect(mockPush).toHaveBeenCalledWith('/world/w1/atlas');
+  });
+
+  it('shows unread news on the Chronicle button and opens it', async () => {
+    social.loadUnreadCounts.mockResolvedValue({ w1: 2, other: 5 });
+    await render(<ActiveWorld worldId="w1" gods={gods} members={members} myId="u-0" />);
+    await fireEvent.press(await screen.findByRole('button', { name: 'Chronicle · 2 new' }));
+    expect(mockPush).toHaveBeenCalledWith('/world/w1/chronicle');
+  });
+
+  it('opens at a place when a chronicle link points to one', async () => {
+    await render(
+      <ActiveWorld worldId="w1" gods={gods} members={members} myId="u-0" focusHex="4,4" />,
+    );
+    expect(await screen.findByText('Homeland of the Dwarves')).toBeTruthy();
   });
 });

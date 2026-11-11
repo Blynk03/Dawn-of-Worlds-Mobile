@@ -1,5 +1,13 @@
 import type { ReactNode } from 'react';
-import { Pressable, type StyleProp, StyleSheet, Text, View, type ViewStyle } from 'react-native';
+import {
+  type LayoutChangeEvent,
+  Pressable,
+  type StyleProp,
+  StyleSheet,
+  Text,
+  View,
+  type ViewStyle,
+} from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -36,9 +44,17 @@ export function GodBadge({
   );
 }
 
-export function Card({ children, style }: { children: ReactNode; style?: StyleProp<ViewStyle> }) {
+export function Card({
+  children,
+  style,
+  onLayout,
+}: {
+  children: ReactNode;
+  style?: StyleProp<ViewStyle>;
+  onLayout?: (e: LayoutChangeEvent) => void;
+}) {
   return (
-    <ThemedView type="backgroundElement" style={[styles.card, style]}>
+    <ThemedView type="backgroundElement" style={[styles.card, style]} onLayout={onLayout}>
       {children}
     </ThemedView>
   );
@@ -129,7 +145,23 @@ export function ErrorMessage({ message }: { message: string | null | undefined }
   );
 }
 
+/** DOW-37: "3 new" in a pill, for worlds with unread actions and comments. */
+export function UnreadBadge({ count }: { count: number }) {
+  const theme = useTheme();
+  if (count <= 0) return null;
+  return (
+    <View
+      accessibilityLabel={`${count} new`}
+      style={[styles.unreadBadge, { backgroundColor: theme.accent }]}>
+      <ThemedText type="smallBold" style={{ color: theme.background }}>
+        {count > 99 ? '99+' : count} new
+      </ThemedText>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
+  unreadBadge: { borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2, alignSelf: 'center' },
   badge: { alignItems: 'center', justifyContent: 'center' },
   card: { borderRadius: Spacing.three, padding: Spacing.three, gap: Spacing.two },
   chip: {

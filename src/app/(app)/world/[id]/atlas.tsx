@@ -1,5 +1,12 @@
 import { useLocalSearchParams } from 'expo-router';
-import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
+import { useRef } from 'react';
+import {
+  ActivityIndicator,
+  ScrollView,
+  type ScrollViewInstance,
+  StyleSheet,
+  View,
+} from 'react-native';
 
 import { Card, GodBadge } from '@/components/game-ui';
 import { ThemedText } from '@/components/themed-text';
@@ -8,6 +15,7 @@ import { Spacing } from '@/constants/theme';
 import { useGame } from '@/game/hooks';
 import { ageName, type CityView, type OrderView, type RaceView } from '@/game/project';
 import type { God } from '@/lib/database.types';
+import { useTheme } from '@/hooks/use-theme';
 import { useLobby } from '@/worlds/hooks';
 
 const ALIGNMENTS: Record<string, string> = { '1': 'Good', '0': 'Neutral', '-1': 'Evil' };
@@ -16,9 +24,15 @@ const alignmentName = (n: number) =>
 
 /** DOW-34/35: every race in the world, with its sects and cities. */
 export default function AtlasScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  // `entity` (a race or city id) scrolls to and highlights its card, e.g. from a chronicle link.
+  const { id, entity } = useLocalSearchParams<{ id: string; entity?: string }>();
   const { view, loaded } = useGame(id, true);
   const { data: lobby } = useLobby(id);
+  const scroll = useRef<ScrollViewInstance>(null);
+  const targetRace =
+    view.races.find((r) => r.id === entity)?.id ??
+    view.cities.find((c) => c.id === entity)?.raceId ??
+    null;
 
   if (!loaded || !lobby) {
     return (
@@ -30,7 +44,7 @@ export default function AtlasScreen() {
 
   return (
     <ThemedView style={styles.fill}>
-      <ScrollView contentContainerStyle={styles.list}>
+      <ScrollView ref={scroll} contentContainerStyle={styles.list}>
         {view.races.length === 0 ? (
           <Card>
             <ThemedText type="smallBold">No races yet</ThemedText>
@@ -46,6 +60,12 @@ export default function AtlasScreen() {
               orders={view.orders.filter((o) => o.raceId === race.id)}
               cities={view.cities.filter((c) => c.raceId === race.id)}
               gods={lobby.gods}
+              highlight={race.id === targetRace ? entity : undefined}
+              onLayoutY={
+                race.id === targetRace
+                  ? (y) => scroll.current?.scrollTo({ y: Math.max(0, y - 12), animated: true })
+                  : undefined
+              }
             />
           ))
         )}
@@ -59,15 +79,25 @@ function RaceCard({
   orders,
   cities,
   gods,
+  highlight,
+  onLayoutY,
 }: {
   race: RaceView;
   orders: OrderView[];
   cities: CityView[];
   gods: God[];
+  /** The id of this race, or one of its cities, to highlight. */
+  highlight?: string;
+  /** Reports where the card is, so the screen can scroll to it. */
+  onLayoutY?: (y: number) => void;
 }) {
+  const theme = useTheme();
   const creator = gods.find((g) => g.id === race.godId);
+  const ring = { borderWidth: 2, borderColor: theme.accent };
   return (
-    <Card style={styles.card}>
+    <Card
+      style={[styles.card, highlight === race.id && ring]}
+      onLayout={onLayoutY ? (e) => onLayoutY(e.nativeEvent.layout.y) : undefined}>
       <View style={styles.header}>
         <GodBadge
           color={creator?.color ?? null}
@@ -106,7 +136,10 @@ function RaceCard({
       {cities.map((city) => {
         const founder = gods.find((g) => g.id === city.godId);
         return (
-          <View key={city.id} style={styles.city} accessibilityLabel={`City of ${city.name}`}>
+          <View
+            key={city.id}
+            style={[styles.city, highlight === city.id && [ring, styles.cityHighlight]]}
+            accessibilityLabel={`City of ${city.name}`}>
             <ThemedText type="smallBold">{city.name}</ThemedText>
             <ThemedText type="small" themeColor="textSecondary">
               Hex {city.hex.x}, {city.hex.y} · {alignmentName(city.alignment)} · founded at{' '}
@@ -128,4 +161,5 @@ const styles = StyleSheet.create({
   card: { gap: Spacing.two },
   header: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   city: { gap: Spacing.half, paddingLeft: Spacing.two },
+  cityHighlight: { borderRadius: Spacing.two, padding: Spacing.two },
 });

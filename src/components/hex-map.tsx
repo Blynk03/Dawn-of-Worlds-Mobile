@@ -1,4 +1,4 @@
-import { memo, useCallback, useMemo, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { type LayoutChangeEvent, Pressable, StyleSheet, Text, View } from 'react-native';
 import {
   GestureDetector,
@@ -24,11 +24,15 @@ const HEX_SIZE = 20;
 const MAX_ZOOM = 5;
 /** How far (in points) a finger can move and still count as a tap or long-press. */
 const TAP_SLOP = 10;
+/** How far in to zoom when bringing a hex into view. */
+const FOCUS_ZOOM = 1.6;
 
 type HexMapProps = {
   map: WorldMapView;
   /** Races and cities to draw on top of the terrain. Memoize it: the layer redraws when it changes. */
   markers?: readonly MapMarker[];
+  /** A hex to bring into view (zoomed in a little), e.g. when following a link to a place. Memoize it. */
+  centerOn?: Hex | null;
   /** Hexes the player may choose right now (e.g. where a city can be founded). */
   candidates?: ReadonlySet<number>;
   /** Hex indexes to highlight (e.g. the hexes chosen for an action). */
@@ -48,6 +52,7 @@ export function HexMap({
   map,
   markers,
   candidates,
+  centerOn,
   selected,
   focused,
   onTapHex,
@@ -82,6 +87,24 @@ export function HexMap({
     },
     [fitScale, pixels, minScale, scale, tx, ty],
   );
+
+  const center = useCallback(
+    (b: { width: number; height: number }, hex: Hex, animate: boolean) => {
+      const s = Math.min(MAX_ZOOM, Math.max(scale.get(), FOCUS_ZOOM));
+      const c = hexCenter(hex, HEX_SIZE);
+      const x = b.width / 2 - c.x * s;
+      const y = b.height / 2 - c.y * s;
+      scale.set(animate ? withTiming(s) : s);
+      tx.set(animate ? withTiming(x) : x);
+      ty.set(animate ? withTiming(y) : y);
+    },
+    [scale, tx, ty],
+  );
+
+  // Follow centerOn when it changes after the map has been laid out.
+  useEffect(() => {
+    if (box && centerOn) center(box, centerOn, true);
+  }, [box, centerOn, center]);
 
   const onLayout = (e: LayoutChangeEvent) => {
     const { width, height } = e.nativeEvent.layout;

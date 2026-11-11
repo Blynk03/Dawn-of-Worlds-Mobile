@@ -4,6 +4,7 @@ import { Button } from '@/components/form';
 import { Card, GodBadge } from '@/components/game-ui';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
+import { describeAction } from '@/chronicle/history';
 import {
   type ActionRecord,
   ageName,
@@ -16,24 +17,9 @@ import type { God } from '@/lib/database.types';
 import { type Hex, hexIndex } from '@/map/hex';
 import { climateInfo, terrainInfo } from '@/map/terrain';
 
-const POWER_NAMES: Record<string, string> = {
-  shapeLand: 'Shape Land',
-  shapeClimate: 'Shape Climate',
-  createRace: 'Create Race',
-  commandRace: 'Command Race',
-};
-
 /** e.g. "Shape Land: Hills", "Create Race: Dwarves", "Command Race: founded Karak". */
 function describeChange(change: ActionRecord): string {
-  const power = POWER_NAMES[change.power] ?? change.power;
-  const what =
-    change.power === 'shapeLand'
-      ? terrainInfo(change.choice).name
-      : change.power === 'shapeClimate'
-        ? climateInfo(change.choice).name
-        : change.intent === 'foundCity'
-          ? `founded ${change.choice}`
-          : change.choice;
+  const { power, what } = describeAction(change);
   return `${power}: ${what}`;
 }
 
