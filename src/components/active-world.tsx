@@ -106,6 +106,11 @@ export function ActiveWorld({ worldId, gods, members, myId, focusHex }: Props) {
         variant="secondary"
         onPress={() => router.push(`/world/${worldId}/atlas`)}
       />
+      <Button
+        title="World settings"
+        variant="secondary"
+        onPress={() => router.push(`/world/${worldId}/settings`)}
+      />
       {myGod ? (
         <Button
           title="Edit your god"

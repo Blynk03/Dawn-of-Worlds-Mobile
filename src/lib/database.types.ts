@@ -40,6 +40,8 @@ export type Database = {
           status: 'lobby' | 'active' | 'finished';
           invite_code: string;
           turn_time_limit_hours: number | null;
+          /** Hours a turn can wait before its player is reminded (0 = never). */
+          reminder_hours: number;
           created_by: string;
           created_at: string;
           updated_at: string;
@@ -51,6 +53,7 @@ export type Database = {
           status?: 'lobby' | 'active' | 'finished';
           invite_code?: string;
           turn_time_limit_hours?: number | null;
+          reminder_hours?: number;
           created_by?: string;
           created_at?: string;
           updated_at?: string;
@@ -58,6 +61,7 @@ export type Database = {
         Update: {
           name?: string;
           turn_time_limit_hours?: number | null;
+          reminder_hours?: number;
         };
         Relationships: [
           {
@@ -206,6 +210,24 @@ export type Database = {
         Update: never;
         Relationships: [];
       };
+      world_notification_settings: {
+        Row: { world_id: string; user_id: string; muted: boolean };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      world_nudges: {
+        Row: {
+          id: number;
+          world_id: string;
+          from_user: string;
+          to_god: string;
+          created_at: string;
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
       action_comments: {
         Row: {
           id: string;
@@ -260,6 +282,10 @@ export type Database = {
         Returns: boolean;
       };
       mark_world_read: { Args: { target_world: string }; Returns: undefined };
+      register_push_token: { Args: { token: string; platform: string }; Returns: undefined };
+      unregister_push_token: { Args: { token: string }; Returns: undefined };
+      set_world_muted: { Args: { target_world: string; muted: boolean }; Returns: undefined };
+      nudge: { Args: { target_world: string }; Returns: string };
       unread_counts: {
         Args: Record<PropertyKey, never>;
         Returns: { world_id: string; unread: number }[];

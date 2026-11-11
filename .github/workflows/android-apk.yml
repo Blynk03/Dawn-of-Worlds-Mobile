@@ -46,6 +46,20 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
       - run: npm ci
 
+      # Firebase config for push notifications (DOW-16), kept in the GOOGLE_SERVICES_JSON
+      # secret because the repo is public. Without it the app builds fine, minus notifications.
+      - name: Add Firebase config
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          if [ -n "$GOOGLE_SERVICES_JSON" ]; then
+            printf '%s' "$GOOGLE_SERVICES_JSON" > google-services.json
+            node -e "JSON.parse(require('fs').readFileSync('google-services.json','utf8'))"
+            echo "Firebase config added."
+          else
+            echo "::notice::No GOOGLE_SERVICES_JSON secret yet, so this build can't get push notifications."
+          fi
+
       # Generate the native Android project from app.json (it isn't committed; see AGENTS.md).
       # The build number increases every run so each new APK installs over the previous one.
       - run: npx expo prebuild --platform android --no-install

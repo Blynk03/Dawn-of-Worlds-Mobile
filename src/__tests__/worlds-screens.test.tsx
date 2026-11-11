@@ -51,6 +51,7 @@ const world = (overrides: Partial<World> = {}): World => ({
   status: 'lobby',
   invite_code: 'ABC234',
   turn_time_limit_hours: null,
+  reminder_hours: 24,
   created_by: 'me',
   created_at: '2026-11-03T00:00:00Z',
   updated_at: '2026-11-03T00:00:00Z',

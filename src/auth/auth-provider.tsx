@@ -11,6 +11,7 @@ import {
   useState,
 } from 'react';
 
+import { unregisterForPush } from '@/notifications/push';
 import { supabase, supabaseConfig } from '@/lib/supabase';
 
 import { parseAuthCallback } from './parse-auth-callback';
@@ -78,6 +79,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const linkError = sessionError ?? urlError;
 
   const signOut = useCallback(async () => {
+    // Stop notifications to this device before the session (needed to unregister) goes away.
+    await unregisterForPush();
     await supabase?.auth.signOut();
   }, []);
   const clearLinkError = useCallback(() => {
