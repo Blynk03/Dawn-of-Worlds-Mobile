@@ -41,6 +41,7 @@ const world = (o: Partial<World> = {}): World => ({
   status: 'active',
   invite_code: 'ABC234',
   turn_time_limit_hours: null,
+  reminder_hours: 24,
   created_by: 'u-active',
   created_at: '',
   updated_at: '',

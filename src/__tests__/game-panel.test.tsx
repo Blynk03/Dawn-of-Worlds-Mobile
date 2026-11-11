@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react-native';
 
 import { GamePanel } from '@/components/game-panel';
 import * as gameApi from '@/game/api';
+import * as notificationsApi from '@/notifications/api';
 import type { GameEvent } from '@/game/project';
 import fixture from '@/game/__tests__/fixtures/server-game.json';
 import type { God } from '@/lib/database.types';
@@ -13,6 +14,11 @@ jest.mock('expo-router', () => {
   return { useFocusEffect: (fn: () => void) => useEffect(fn, [fn]) };
 });
 jest.mock('@/game/api');
+jest.mock('@/notifications/api', () => ({
+  ...jest.requireActual('@/notifications/api'),
+  loadNextNudge: jest.fn(),
+  nudge: jest.fn(),
+}));
 const DEADLINE = new Date(fixture.state.turn_deadline);
 const hoursBefore = (h: number) => new Date(DEADLINE.getTime() - h * 3_600_000);
 let mockNow = hoursBefore(5);
@@ -22,6 +28,7 @@ jest.mock('@/game/hooks', () => ({
 }));
 
 const api = jest.mocked(gameApi);
+const notifications = jest.mocked(notificationsApi);
 
 const god = (id: string, user_id: string, name: string, color: string, sigil: string): God => ({
   id,
@@ -60,6 +67,8 @@ beforeEach(() => {
   api.subscribeToGameEvents.mockReturnValue(() => {});
   api.endTurn.mockResolvedValue();
   api.skipTimedOutTurn.mockResolvedValue();
+  notifications.loadNextNudge.mockResolvedValue(null);
+  notifications.nudge.mockImplementation(async () => new Date(mockNow.getTime() + 12 * 3_600_000));
 });
 
 const renderPanel = (myId: string) =>
@@ -142,5 +151,36 @@ describe('GamePanel', () => {
     await renderPanel(active.user_id);
     await fireEvent.press(await screen.findByRole('button', { name: 'End turn' }));
     expect(await screen.findByText("It isn't your turn")).toBeTruthy();
+  });
+
+  it('lets waiting players nudge whoever is taking their turn (DOW-28)', async () => {
+    await renderPanel(first.user_id);
+    await fireEvent.press(await screen.findByRole('button', { name: `Nudge ${active.name}` }));
+    expect(notifications.nudge).toHaveBeenCalledWith('w');
+    expect(
+      await screen.findByText(
+        `Nudged! ${active.name}'s player will get a notification. You can nudge again in 12h.`,
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByRole('button', { name: `Nudge ${active.name}` })).toBeNull();
+  });
+
+  it('says when you can nudge again', async () => {
+    notifications.loadNextNudge.mockResolvedValue(new Date(mockNow.getTime() + 3 * 3_600_000));
+    await renderPanel(first.user_id);
+    expect(await screen.findByText('You nudged them. You can nudge again in 3h.')).toBeTruthy();
+  });
+
+  it('shows why a nudge failed', async () => {
+    notifications.nudge.mockRejectedValueOnce(new Error('You can nudge again in 4 hours'));
+    await renderPanel(first.user_id);
+    await fireEvent.press(await screen.findByRole('button', { name: `Nudge ${active.name}` }));
+    expect(await screen.findByText('You can nudge again in 4 hours')).toBeTruthy();
+  });
+
+  it("doesn't offer a nudge on your own turn", async () => {
+    await renderPanel(active.user_id);
+    await screen.findByRole('button', { name: 'End turn' });
+    expect(screen.queryByRole('button', { name: /^Nudge/ })).toBeNull();
   });
 });

@@ -41,3 +41,6 @@ yarn-error.*
 /ios
 /android
 coverage/
+
+# Firebase config for push notifications (from the GOOGLE_SERVICES_JSON secret in CI)
+google-services.json

@@ -37,7 +37,14 @@
           "imageWidth": 76
         }
       ],
-      "expo-sqlite"
+      "expo-sqlite",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/android-icon-monochrome.png",
+          "color": "#E3B05B"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
