@@ -1,0 +1,84 @@
+name: Set up Android signing (EAS)
+
+# Run once, by hand (Actions → "Set up Android signing (EAS)" → Run workflow).
+#
+# Creates the app's Android signing key (upload keystore) on Expo's servers and starts the first
+# cloud build. Expo only creates a keystore in interactive mode, on purpose, so that someone
+# chooses to make one; this job answers "yes" to that question for you. The key never leaves
+# Expo. Afterwards the app's "application identifier" exists on expo.dev, which is where the
+# Firebase (FCM V1) key for push notifications is uploaded (docs/notifications.md).
+#
+# Needs the EXPO_TOKEN secret (expo.dev → Account settings → Access tokens).
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check the Expo token is set
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          if [ -z "$EXPO_TOKEN" ]; then
+            echo "::error::Add the EXPO_TOKEN secret first (expo.dev → Account settings → Access tokens)."
+            exit 1
+          fi
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - run: npm ci
+      - uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Add Firebase config
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          if [ -n "$GOOGLE_SERVICES_JSON" ]; then
+            printf '%s' "$GOOGLE_SERVICES_JSON" > google-services.json
+            node -e "JSON.parse(require('fs').readFileSync('google-services.json','utf8'))"
+            echo "Firebase config added."
+          else
+            echo "::notice::No GOOGLE_SERVICES_JSON secret yet; this build won't get push notifications."
+          fi
+
+      - name: Who is signed in to Expo
+        run: eas whoami
+
+      # `expect` gives eas-cli a terminal so it can ask its questions, and answers yes to each:
+      # chiefly "Generate a new Android Keystore?". --no-wait returns once the build is queued.
+      - name: Create the keystore and start the first build
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq expect
+          cat > /tmp/eas-setup.exp <<'EOF'
+          set timeout 900
+          spawn eas build --platform android --profile preview --no-wait
+          expect {
+            -re {Generate a new Android Keystore\?[^\r\n]*} { send "y\r"; exp_continue }
+            -re {\(Y/n\)}                            { send "y\r"; exp_continue }
+            -re {\(y/N\)}                            { send "y\r"; exp_continue }
+            timeout { puts "\nTimed out waiting for eas-cli."; exit 1 }
+            eof
+          }
+          lassign [wait] pid spawnid os_error status
+          exit $status
+          EOF
+          expect /tmp/eas-setup.exp
+
+      - name: Show the app's signing credentials
+        if: always()
+        run: eas credentials:list --platform android --non-interactive 2>/dev/null || true
