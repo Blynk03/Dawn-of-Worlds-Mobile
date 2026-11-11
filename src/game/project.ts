@@ -59,6 +59,10 @@ export type ActionRecord = HexChange & {
   hexes: [number, number][];
   /** What a command was for, e.g. 'foundCity' for Command Race. */
   intent: string | null;
+  /** The world's year when it happened. */
+  year: number;
+  /** When it was logged (ISO time). */
+  at: string;
 };
 
 /** When and by whom something entered the world. */
@@ -262,6 +266,8 @@ export function applyEvent(view: GameView, event: GameEvent): GameView {
         cost: num(p.cost),
         hexes,
         intent: str(p.intent),
+        year: view.year,
+        at: event.created_at,
       };
       next.actions = [...view.actions, action];
       const origin: Origin = {

@@ -19,7 +19,8 @@ import { canStart, MIN_GODS_TO_START, playersWithoutGods } from '@/worlds/summar
 
 /** DOW-22: a world's lobby — invite friends, see everyone's gods, and start the game. */
 export default function WorldScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  // `hex` ("x,y") opens the map at a place, e.g. from a chronicle link.
+  const { id, hex } = useLocalSearchParams<{ id: string; hex?: string }>();
   const router = useRouter();
   const { session } = useAuth();
   const myId = session?.user.id ?? '';
@@ -81,7 +82,7 @@ export default function WorldScreen() {
     return (
       <ThemedView style={styles.fill}>
         <Stack.Screen options={{ title: world.name }} />
-        <ActiveWorld worldId={world.id} gods={gods} members={members} myId={myId} />
+        <ActiveWorld worldId={world.id} gods={gods} members={members} myId={myId} focusHex={hex} />
       </ThemedView>
     );
   }
