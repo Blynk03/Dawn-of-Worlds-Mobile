@@ -21,6 +21,8 @@ export const PowerSchema = z.object({
   oncePerTargetPerTurn: z.boolean().optional(),
   /** Set when the price isn't from the original rules, saying where it comes from. */
   houseRule: z.string().optional(),
+  /** Set when the price is in the rules' text rather than the Table of Powers. */
+  source: z.string().optional(),
 });
 
 export const RulesetSchema = z

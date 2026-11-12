@@ -169,6 +169,115 @@ export async function changeAlignment(
   return data;
 }
 
+/** DOW-44: Create Order within a race. */
+export async function createOrder(
+  worldId: string,
+  raceId: string,
+  name: string,
+  orderType: string,
+  purpose: string,
+): Promise<void> {
+  const { error } = await client().rpc('create_order', {
+    target_world: worldId,
+    race: raceId,
+    order_name: name,
+    order_type: orderType,
+    purpose,
+  });
+  if (error) throw new Error(friendlyError(error));
+}
+
+/** DOW-44/39: Command Order (costs more if it isn't yours). */
+export async function commandOrder(
+  worldId: string,
+  orderId: string,
+  directive: string,
+): Promise<void> {
+  const { error } = await client().rpc('command_order', {
+    target_world: worldId,
+    target_order: orderId,
+    directive,
+  });
+  if (error) throw new Error(friendlyError(error));
+}
+
+/** DOW-45: Create Avatar, optionally among a race. */
+export async function createAvatar(
+  worldId: string,
+  avatar: {
+    name: string;
+    avatarType: string;
+    description: string;
+    raceId: string | null;
+    hex: { x: number; y: number };
+  },
+): Promise<void> {
+  const { error } = await client().rpc('create_avatar', {
+    target_world: worldId,
+    avatar_name: avatar.name,
+    avatar_type: avatar.avatarType,
+    description: avatar.description,
+    race: avatar.raceId,
+    hex_x: avatar.hex.x,
+    hex_y: avatar.hex.y,
+  });
+  if (error) throw new Error(friendlyError(error));
+}
+
+/** What an avatar can be told to do (DOW-45), with that action's details. */
+export type AvatarCommand =
+  | { intent: 'deed'; description: string }
+  | {
+      intent: 'foundCity';
+      race: string;
+      name: string;
+      x: number;
+      y: number;
+      description: string;
+    }
+  | { intent: 'createOrder'; race: string; name: string; order_type: string; purpose: string }
+  | { intent: 'commandOrder'; order: string; directive: string }
+  | { intent: 'purifyCity' | 'corruptCity'; city: string; description: string }
+  | {
+      intent: 'createRace';
+      name: string;
+      description: string;
+      appearance: string;
+      alignment: number;
+      x: number;
+      y: number;
+    };
+
+/** DOW-45: Command Avatar: one action this turn, for the price of Command Avatar. */
+export async function commandAvatar(
+  worldId: string,
+  avatarId: string,
+  command: AvatarCommand,
+): Promise<void> {
+  const { intent, ...args } = command;
+  const { error } = await client().rpc('command_avatar', {
+    target_world: worldId,
+    avatar: avatarId,
+    intent,
+    args,
+  });
+  if (error) throw new Error(friendlyError(error));
+}
+
+/** DOW-45: bring a slain avatar back (its creator, for 5). */
+export async function resurrectAvatar(
+  worldId: string,
+  avatarId: string,
+  description: string,
+): Promise<void> {
+  const { error } = await client().rpc('resurrect_avatar', {
+    target_world: worldId,
+    avatar: avatarId,
+    description,
+  });
+  if (error) throw new Error(friendlyError(error));
+}
+
 let channelCounter = 0;
 
 /**

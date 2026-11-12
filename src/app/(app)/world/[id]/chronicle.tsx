@@ -25,6 +25,9 @@ import { useLobby } from '@/worlds/hooks';
 
 type Tab = 'feed' | 'history';
 
+/** How many entries to draw before scrolling: a few screens' worth, so the chronicle opens full. */
+const INITIAL_ITEMS = 25;
+
 /**
  * The world's chronicle. Feed (DOW-37): what the gods did, newest first, with reactions and
  * comments. History (DOW-36): the History Chart, every action in order, filterable.
@@ -72,6 +75,7 @@ export default function ChronicleScreen() {
         <FlatList
           data={[...view.actions].reverse()}
           keyExtractor={(a) => String(a.seq)}
+          initialNumToRender={INITIAL_ITEMS}
           contentContainerStyle={styles.list}
           ListHeaderComponent={
             <View style={styles.gap}>
@@ -209,6 +213,7 @@ function History({
     <FlatList
       data={rows}
       keyExtractor={(a) => String(a.seq)}
+      initialNumToRender={INITIAL_ITEMS}
       contentContainerStyle={styles.list}
       ListHeaderComponent={filters}
       ListEmptyComponent={view.actions.length === 0 ? <Empty /> : undefined}

@@ -81,6 +81,34 @@ describe('History Chart (DOW-36)', () => {
     );
   });
 
+  it('describes orders and avatars (DOW-44/45)', () => {
+    expect(describeAction(byPower('createOrder'))).toEqual({
+      power: 'Create Order',
+      what: 'Hammers of the Deep',
+    });
+    expect(describeAction(byPower('commandOrder'))).toEqual({
+      power: 'Command Order',
+      what: 'Hammers of the Deep',
+    });
+    expect(describeAction(byPower('createAvatar')).what).toBe('Durin');
+    expect(describeAction(byPower('commandAvatar'))).toEqual({
+      power: 'Command Avatar',
+      what: 'Durin, a mortal deed',
+    });
+    const deed = byPower('commandAvatar');
+    const as = (intent: string, choice: string, alignmentAfter: number | null = null) =>
+      describeAction({ ...deed, intent, choice, alignmentAfter }).what;
+    expect(as('foundCity', 'Durinhall')).toBe('Durin founds Durinhall');
+    expect(as('createOrder', 'Deepwatch')).toBe('Durin creates the order Deepwatch');
+    expect(as('commandOrder', 'Deepwatch')).toBe('Durin commands Deepwatch');
+    expect(as('purifyCity', 'Karak', 3)).toBe('Durin purifies Karak, now Virtuous (+3)');
+    expect(as('corruptCity', 'Karak', 1)).toBe('Durin corrupts Karak, now Good (+1)');
+    expect(as('createRace', 'Merfolk')).toBe('Durin creates the Merfolk');
+    expect(
+      describeAction({ ...deed, power: 'resurrectAvatar', avatar: null, choice: 'Durin' }).what,
+    ).toBe('Durin returns');
+  });
+
   it('knows which races and cities an action involves', () => {
     expect(actionEntities(view, byPower('shapeLand'))).toEqual([]);
     expect(actionEntities(view, byPower('createRace'))).toEqual([
@@ -103,6 +131,10 @@ describe('History Chart (DOW-36)', () => {
       { id: karak.id, kind: 'city', name: 'Karak' },
     ]);
     expect(actionEntities(view, byPower('corruptRegion'))).toEqual([]);
+    const dwarvesRef = [{ id: dwarves.id, kind: 'race', name: 'Dwarves' }];
+    expect(actionEntities(view, byPower('createOrder'))).toEqual(dwarvesRef);
+    expect(actionEntities(view, byPower('commandOrder'))).toEqual(dwarvesRef);
+    expect(actionEntities(view, byPower('commandAvatar'))).toEqual(dwarvesRef); // Durin walks among them
   });
 
   it('filters by age, god and race or city', () => {
@@ -119,6 +151,10 @@ describe('History Chart (DOW-36)', () => {
       'createSubrace',
       'advanceCivilization',
       'purifyCity',
+      'createOrder',
+      'commandOrder',
+      'createAvatar',
+      'commandAvatar',
     ]);
     expect(historyRows(view, { entityId: karak.id }).map((r) => r.power)).toEqual([
       'commandRace',

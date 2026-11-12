@@ -8,7 +8,7 @@ import { type GameEvent, projectWorld } from '@/game/project';
 import type { God, World, WorldMapRow } from '@/lib/database.types';
 import * as worldsApi from '@/worlds/api';
 
-import { withoutRaces } from '../../test/fixture-helpers';
+import { withAvatar, withOrder, withoutRaces } from '../../test/fixture-helpers';
 
 const mockRouter = { push: jest.fn(), replace: jest.fn(), back: jest.fn() };
 let mockAuthUser = 'u-active';
@@ -127,7 +127,7 @@ describe('Choosing a power (DOW-26)', () => {
     expect(screen.getByText('Races')).toBeTruthy();
     expect(screen.getByText('3 / hex')).toBeTruthy(); // Shape Land, First Age
     expect(screen.getByText('22')).toBeTruthy(); // Create Race
-    for (const name of ['Shape Land', 'Shape Climate', 'Create Race', 'Found a city']) {
+    for (const name of ['Shape Land', 'Shape Climate', 'Create Race', 'Create Order']) {
       expect(screen.getByRole('button', { name })).toBeEnabled();
     }
   });
@@ -148,8 +148,8 @@ describe('Choosing a power (DOW-26)', () => {
     await render(<ActScreen />);
     await screen.findByText('Solara has 100 power.');
     expect(screen.getByRole('button', { name: 'Found a city' })).toBeDisabled();
-    // Found a city, Create Subrace and Advance all need a race.
-    expect(screen.getAllByText('No races yet: create one first')).toHaveLength(3);
+    // Found a city, Create Subrace, Advance and Create Order all need a race.
+    expect(screen.getAllByText('No races yet: create one first')).toHaveLength(4);
   });
 
   it('can go back and choose another power', async () => {
@@ -299,7 +299,8 @@ describe('Found a city (DOW-35)', () => {
   const dwarves = view.races[0];
 
   beforeEach(() => {
-    game.loadGameEvents.mockResolvedValue(eventsWithPower(30));
+    // DOW-38: the active god needs an order among the Dwarves to command them.
+    game.loadGameEvents.mockResolvedValue(withOrder(eventsWithPower(30), activeGodId, dwarves.id));
     game.foundCity.mockResolvedValue('new-city');
   });
 
@@ -558,5 +559,207 @@ describe('Purify and Corrupt (DOW-46, DOW-40)', () => {
     ).toMatchObject({
       disabled: false,
     });
+  });
+});
+
+describe('Orders (DOW-44, DOW-38, DOW-39)', () => {
+  const [dwarves, deep] = view.races;
+  const hammers = view.orders.find((o) => o.name === 'Hammers of the Deep')!;
+  const mine = hammers.godId === activeGodId;
+
+  beforeEach(() => {
+    game.loadGameEvents.mockResolvedValue(eventsWithPower(30));
+    game.createOrder.mockResolvedValue();
+    game.commandOrder.mockResolvedValue();
+  });
+
+  it('creates an order of knights within a race', async () => {
+    await render(<ActScreen />);
+    await openPower('Create Order');
+    await fireEvent.press(screen.getByLabelText('Deep Dwarves'));
+    await fireEvent.changeText(screen.getByLabelText('Order name'), 'The Pale Watch');
+    await fireEvent.press(screen.getByLabelText('Knights'));
+    await fireEvent.changeText(screen.getByLabelText('What is it for?'), 'Guard the deep roads');
+    expect(screen.getByText('The Pale Watch among the Deep Dwarves')).toBeTruthy();
+    expect(screen.getByText("Costs 8. You'll have 22 power left.")).toBeTruthy();
+    await fireEvent.press(screen.getByRole('button', { name: 'Create the order' }));
+    expect(game.createOrder).toHaveBeenCalledWith(
+      'w1',
+      deep.id,
+      'The Pale Watch',
+      'knights',
+      'Guard the deep roads',
+    );
+  });
+
+  it("commands an order, charging extra for someone else's", async () => {
+    await render(<ActScreen />);
+    await openPower('Command Order');
+    const extra = mine ? 0 : 5; // the Hammers are knights, not a sect
+    await fireEvent.press(
+      screen.getByLabelText(new RegExp(`^Hammers of the Deep \\(Dwarves\\) · ${4 + extra}`)),
+    );
+    expect(
+      screen.getByText(`Costs ${4 + extra}. You'll have ${26 - extra} power left.`),
+    ).toBeTruthy();
+    await fireEvent.changeText(screen.getByLabelText('What do they do?'), 'Ride out');
+    await fireEvent.press(screen.getByRole('button', { name: 'Command Hammers of the Deep' }));
+    expect(game.commandOrder).toHaveBeenCalledWith('w1', hammers.id, 'Ride out');
+  });
+
+  it('only lets you command races where you have an order or avatar', async () => {
+    // The active god gets an order among the Deep Dwarves only.
+    game.loadGameEvents.mockResolvedValue(withOrder(eventsWithPower(30), activeGodId, deep.id));
+    await render(<ActScreen />);
+    await openPower('Found a city');
+    const present = view.orders.some((o) => o.godId === activeGodId && o.raceId === dwarves.id);
+    expect(screen.getByLabelText('Deep Dwarves').props.accessibilityState).toMatchObject({
+      checked: true,
+    });
+    if (!present) {
+      expect(
+        screen.getByLabelText('Dwarves · no order or avatar here').props.accessibilityState,
+      ).toMatchObject({ disabled: true });
+    }
+  });
+
+  it('says why you can’t found a city without presence anywhere', async () => {
+    const events = withoutRaces(fixture.events as GameEvent[]);
+    // One race, made by someone else, so the active god has no presence in it.
+    const someoneElse = view.turnOrder.find((g) => g !== activeGodId)!;
+    const created = (fixture.events as GameEvent[]).find(
+      (e) => (e.payload as { power?: string }).power === 'createRace',
+    )!;
+    const last = events[events.length - 1];
+    events.push({
+      ...created,
+      seq: last.seq + 1,
+      god_id: someoneElse,
+      round: last.round,
+      age: last.age,
+    });
+    game.loadGameEvents.mockResolvedValue(
+      eventsWithPower(30, events).map((e) =>
+        e.god_id === activeGodId && (e.payload as { order?: unknown }).order
+          ? { ...e, god_id: someoneElse }
+          : e,
+      ),
+    );
+    await render(<ActScreen />);
+    await screen.findByText(/has 30 power\./);
+    expect(screen.getByRole('button', { name: 'Found a city' })).toBeDisabled();
+    expect(screen.getByText('You need an order or avatar among a race first')).toBeTruthy();
+  });
+});
+
+describe('Avatars (DOW-45)', () => {
+  const [dwarves] = view.races;
+  const karak = view.cities[0];
+
+  beforeEach(() => {
+    game.loadGameEvents.mockResolvedValue(
+      withAvatar(eventsWithPower(30), activeGodId, null, 'Aelin'),
+    );
+    game.createAvatar.mockResolvedValue();
+    game.commandAvatar.mockResolvedValue();
+  });
+
+  it('creates an avatar anywhere on the map', async () => {
+    await render(<ActScreen />);
+    await openPower('Create Avatar');
+    await fireEvent.changeText(screen.getByLabelText('Avatar name'), 'Morwen');
+    await fireEvent.press(screen.getByLabelText('Dragon'));
+    await fireEvent.changeText(screen.getByLabelText('Who are they?'), 'Eldest of wyrms');
+    await fireEvent.press(screen.getByLabelText('Dwarves'));
+    await fireEvent.press(screen.getByLabelText('hex 0,0')); // even at sea
+    expect(screen.getByText('Morwen appears at hex 0, 0')).toBeTruthy();
+    expect(screen.getByText("Costs 10. You'll have 20 power left.")).toBeTruthy();
+    await fireEvent.press(screen.getByRole('button', { name: 'Create the avatar' }));
+    expect(game.createAvatar).toHaveBeenCalledWith('w1', {
+      name: 'Morwen',
+      avatarType: 'Dragon',
+      description: 'Eldest of wyrms',
+      raceId: dwarves.id,
+      hex: { x: 0, y: 0 },
+    });
+  });
+
+  it('commands an avatar to a mortal deed for 2', async () => {
+    await render(<ActScreen />);
+    await openPower('Command Avatar');
+    await fireEvent.press(screen.getByLabelText('Aelin'));
+    await fireEvent.press(screen.getByLabelText('A mortal deed'));
+    expect(screen.getByText("Costs 2. You'll have 28 power left.")).toBeTruthy();
+    await fireEvent.changeText(screen.getByLabelText('What does Aelin do?'), 'Slays the wyrm');
+    await fireEvent.press(screen.getByRole('button', { name: 'Command Aelin' }));
+    expect(game.commandAvatar).toHaveBeenCalledWith('w1', 'avatar-Aelin', {
+      intent: 'deed',
+      description: 'Slays the wyrm',
+    });
+  });
+
+  it('founds a city through the avatar, without needing an order there, for 2', async () => {
+    await render(<ActScreen />);
+    await openPower('Command Avatar');
+    await fireEvent.press(screen.getByLabelText('Aelin'));
+    await fireEvent.press(screen.getByLabelText('Found a city'));
+    expect(screen.getByLabelText('Dwarves').props.accessibilityState).toMatchObject({
+      disabled: false,
+    });
+    await fireEvent.press(screen.getByLabelText('hex 5,5'));
+    await fireEvent.changeText(screen.getByLabelText('City name'), 'Aelinford');
+    await fireEvent.changeText(screen.getByLabelText('What happens?'), 'Aelin builds a ford');
+    expect(screen.getByText("Costs 2. You'll have 28 power left.")).toBeTruthy();
+    await fireEvent.press(screen.getByRole('button', { name: 'Found the city' }));
+    expect(game.commandAvatar).toHaveBeenCalledWith('w1', 'avatar-Aelin', {
+      intent: 'foundCity',
+      race: dwarves.id,
+      name: 'Aelinford',
+      x: 5,
+      y: 5,
+      description: 'Aelin builds a ford',
+    });
+  });
+
+  it('purifies a city through the avatar (cities only)', async () => {
+    await render(<ActScreen />);
+    await openPower('Command Avatar');
+    await fireEvent.press(screen.getByLabelText('Aelin'));
+    await fireEvent.press(screen.getByLabelText('Purify a city'));
+    expect(screen.queryByLabelText('Region')).toBeNull();
+    await fireEvent.press(screen.getByLabelText(/^Karak · Noble/));
+    await fireEvent.changeText(screen.getByLabelText('What happens?'), 'Aelin blesses Karak');
+    await fireEvent.press(screen.getByRole('button', { name: 'Purify Karak' }));
+    expect(game.commandAvatar).toHaveBeenCalledWith('w1', 'avatar-Aelin', {
+      intent: 'purifyCity',
+      city: karak.id,
+      description: 'Aelin blesses Karak',
+    });
+  });
+
+  it('greys out avatars that already acted this turn, and resurrection when none is slain', async () => {
+    const events = withAvatar(eventsWithPower(30), activeGodId, null, 'Aelin');
+    const last = events[events.length - 1];
+    events.push({
+      ...last,
+      seq: last.seq + 1,
+      payload: {
+        power: 'commandAvatar',
+        intent: 'deed',
+        cost: 2,
+        hexes: [[1, 1]],
+        choice: 'Aelin',
+        description: 'Already busy',
+        power_after: 28,
+        avatar: { id: 'avatar-Aelin', name: 'Aelin' },
+      },
+    });
+    game.loadGameEvents.mockResolvedValue(events);
+    await render(<ActScreen />);
+    await screen.findByText(/has 28 power\./);
+    expect(screen.getByRole('button', { name: 'Command Avatar' })).toBeDisabled();
+    expect(screen.getByText('Your avatars have all acted (or are slain)')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Resurrect Avatar' })).toBeDisabled();
+    expect(screen.getByText('None of your avatars is slain')).toBeTruthy();
   });
 });

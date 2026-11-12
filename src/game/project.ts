@@ -63,6 +63,8 @@ export type ActionRecord = HexChange & {
   intent: string | null;
   /** What an action was aimed at (Advance, Purify, Corrupt). `key` is the id, or "x,y" for a region. */
   target: ActionTarget | null;
+  /** For Command Avatar: the avatar that acted. */
+  avatar: { id: string; name: string } | null;
   /** For Purify / Corrupt: the target's alignment afterwards. */
   alignmentAfter: number | null;
   /** The world's year when it happened. */
@@ -72,7 +74,7 @@ export type ActionRecord = HexChange & {
 };
 
 export type ActionTarget = {
-  kind: 'race' | 'city' | 'region';
+  kind: 'race' | 'city' | 'region' | 'order' | 'avatar';
   id: string | null;
   key: string;
   name: string;
@@ -109,7 +111,31 @@ export type CityView = Origin & {
 export type AdvancementView = Origin & { id: string; entityId: string; field: string };
 
 /** A sect (order) within a race; a race's creator gets one automatically. */
-export type OrderView = Origin & { id: string; name: string; raceId: string };
+/** DOW-44: an order within a race: a religious sect, knights, thieves' guild, brigands, pirates… */
+export type OrderView = Origin & {
+  id: string;
+  name: string;
+  raceId: string;
+  orderType: OrderType;
+  purpose: string;
+  /** 'destroyed' once wiped out (no longer a presence among its race). */
+  status: 'active' | 'destroyed';
+};
+
+export type OrderType = 'religious' | 'knights' | 'thieves' | 'brigands' | 'pirates' | 'other';
+
+/** DOW-45: a major figure: a high priest, a dragon, a dynasty… */
+export type AvatarView = Origin & {
+  id: string;
+  name: string;
+  avatarType: string;
+  description: string;
+  /** The race it walks among, if any. */
+  raceId: string | null;
+  hex: { x: number; y: number };
+  /** 'destroyed' while slain; its creator can resurrect it. */
+  status: 'active' | 'destroyed';
+};
 
 export type GameView = {
   started: boolean;
@@ -136,6 +162,7 @@ export type GameView = {
   races: RaceView[];
   cities: CityView[];
   orders: OrderView[];
+  avatars: AvatarView[];
   advancements: AdvancementView[];
   /** seq of the current round's round_started event. */
   roundStartSeq: number;
@@ -162,6 +189,7 @@ export const EMPTY_GAME: GameView = {
   cities: [],
   orders: [],
   advancements: [],
+  avatars: [],
   roundStartSeq: 0,
   lastSeq: 0,
 };
@@ -292,6 +320,11 @@ export function applyEvent(view: GameView, event: GameEvent): GameView {
         cost: num(p.cost),
         hexes,
         intent: str(p.intent),
+        avatar: (() => {
+          const a = asObj(p.avatar);
+          const id = str(a.id);
+          return id ? { id, name: str(a.name) ?? '' } : null;
+        })(),
         target: targetOf(p.target),
         alignmentAfter:
           typeof asObj(p.alignment).after === 'number' ? num(asObj(p.alignment).after) : null,
@@ -305,51 +338,79 @@ export function applyEvent(view: GameView, event: GameEvent): GameView {
         age: event.age,
         round: event.round,
       };
-      if (action.power === 'createRace' || action.power === 'createSubrace') {
-        const race = asObj(p.race);
-        const order = asObj(p.order);
-        const id = str(race.id);
-        if (id) {
-          next.races = [
-            ...view.races,
-            {
-              ...origin,
-              id,
-              name: str(race.name) ?? action.choice,
-              description: str(race.description) ?? '',
-              appearance: str(race.appearance) ?? '',
-              alignment: num(race.alignment),
-              hex: hexOf(race.hex),
-              parentId: str(race.parent_id),
-            },
-          ];
-          const orderId = str(order.id);
-          if (orderId) {
-            next.orders = [
-              ...view.orders,
-              { ...origin, id: orderId, name: str(order.name) ?? '', raceId: id },
-            ];
-          }
-        }
+      // Whatever the power (or avatar) that made them, new races, orders, cities and avatars
+      // arrive in the payload.
+      const race = asObj(p.race);
+      const raceId = str(race.id);
+      if (raceId) {
+        next.races = [
+          ...view.races,
+          {
+            ...origin,
+            id: raceId,
+            name: str(race.name) ?? action.choice,
+            description: str(race.description) ?? '',
+            appearance: str(race.appearance) ?? '',
+            alignment: num(race.alignment),
+            hex: hexOf(race.hex),
+            parentId: str(race.parent_id),
+          },
+        ];
       }
-      if (action.power === 'commandRace' && action.intent === 'foundCity') {
-        const city = asObj(p.city);
-        const id = str(city.id);
-        const raceId = str(city.race_id);
-        if (id && raceId) {
-          next.cities = [
-            ...view.cities,
-            {
-              ...origin,
-              id,
-              name: str(city.name) ?? action.choice,
-              raceId,
-              alignment: num(city.alignment),
-              hex: hexOf(city.hex),
-              description: action.description,
-            },
-          ];
-        }
+      const order = asObj(p.order);
+      const orderId = str(order.id);
+      const orderRace = str(order.race_id) ?? raceId;
+      if (orderId && orderRace) {
+        next.orders = [
+          ...view.orders,
+          {
+            ...origin,
+            id: orderId,
+            name: str(order.name) ?? '',
+            raceId: orderRace,
+            orderType: orderTypeOf(order.order_type),
+            purpose: str(order.purpose) ?? '',
+            status: 'active',
+          },
+        ];
+      }
+      const city = asObj(p.city);
+      const cityId = str(city.id);
+      const cityRace = str(city.race_id);
+      if (cityId && cityRace) {
+        next.cities = [
+          ...view.cities,
+          {
+            ...origin,
+            id: cityId,
+            name: str(city.name) ?? action.choice,
+            raceId: cityRace,
+            alignment: num(city.alignment),
+            hex: hexOf(city.hex),
+            description: action.description,
+          },
+        ];
+      }
+      const avatar = asObj(p.avatar);
+      const avatarId = str(avatar.id);
+      if (avatarId && action.power === 'createAvatar') {
+        next.avatars = [
+          ...view.avatars,
+          {
+            ...origin,
+            id: avatarId,
+            name: str(avatar.name) ?? action.choice,
+            avatarType: str(avatar.avatar_type) ?? '',
+            description: str(avatar.description) ?? action.description,
+            raceId: str(avatar.race_id),
+            hex: hexOf(avatar.hex),
+            status: 'active',
+          },
+        ];
+      } else if (avatarId && avatar.status === 'active') {
+        next.avatars = view.avatars.map((a) =>
+          a.id === avatarId ? { ...a, status: 'active' } : a,
+        );
       }
       if (action.power === 'advanceCivilization' || action.power === 'advanceCity') {
         const advancement = asObj(p.advancement);
@@ -429,8 +490,30 @@ function targetOf(v: unknown): ActionTarget | null {
   const t = asObj(v);
   const kind = str(t.kind);
   const key = str(t.key) ?? str(t.id);
-  if ((kind !== 'race' && kind !== 'city' && kind !== 'region') || !key) return null;
+  if (
+    (kind !== 'race' &&
+      kind !== 'city' &&
+      kind !== 'region' &&
+      kind !== 'order' &&
+      kind !== 'avatar') ||
+    !key
+  ) {
+    return null;
+  }
   return { kind, id: str(t.id), key, name: str(t.name) ?? '' };
+}
+
+const ORDER_TYPES: OrderType[] = [
+  'religious',
+  'knights',
+  'thieves',
+  'brigands',
+  'pirates',
+  'other',
+];
+
+function orderTypeOf(v: unknown): OrderType {
+  return ORDER_TYPES.includes(v as OrderType) ? (v as OrderType) : 'religious';
 }
 
 function hexOf(v: unknown): { x: number; y: number } {

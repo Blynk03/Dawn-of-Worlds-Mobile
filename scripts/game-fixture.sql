@@ -109,6 +109,21 @@ select pg_temp.act_sql('11111111-1111-1111-1111-111111111111', $q$
 select pg_temp.act_sql('11111111-1111-1111-1111-111111111111', $q$
   select public.change_alignment('11111111-1111-1111-1111-111111111111', 'region', null, 2, 2, -1,
     'A blight in the woods')$q$);
+-- DOW-44/45: an order, a command to it, an avatar, and the avatar's deed.
+select pg_temp.act_sql('11111111-1111-1111-1111-111111111111', $q$
+  select public.create_order('11111111-1111-1111-1111-111111111111',
+    (select id from public.world_entities where name = 'Dwarves'), 'Hammers of the Deep', 'knights',
+    'Guard the mountain gates')$q$);
+select pg_temp.act_sql('11111111-1111-1111-1111-111111111111', $q$
+  select public.command_order('11111111-1111-1111-1111-111111111111',
+    (select id from public.world_entities where name = 'Hammers of the Deep'), 'Ride to the border')$q$);
+select pg_temp.act_sql('11111111-1111-1111-1111-111111111111', $q$
+  select public.create_avatar('11111111-1111-1111-1111-111111111111', 'Durin', 'Dwarf king',
+    'The deathless king', (select id from public.world_entities where name = 'Dwarves'), 4, 4)$q$);
+select pg_temp.act_sql('11111111-1111-1111-1111-111111111111', $q$
+  select public.command_avatar('11111111-1111-1111-1111-111111111111',
+    (select id from public.world_entities where name = 'Durin'), 'deed',
+    '{"description": "Durin slays the wyrm of the north"}')$q$);
 select pg_temp.play('11111111-1111-1111-1111-111111111111', false, false);
 reset role;
 update public.world_state set turn_deadline = now() - interval '1 minute'
@@ -130,7 +145,8 @@ select jsonb_pretty(jsonb_build_object(
   'powers', (select jsonb_object_agg(god_id, jsonb_build_object('power', power, 'lowPoolBonus', low_pool_bonus))
     from public.god_power where world_id = '11111111-1111-1111-1111-111111111111'),
   'entities', (select jsonb_agg(jsonb_build_object('id', id, 'kind', kind, 'name', name, 'race_id', race_id,
-      'god_id', god_id, 'alignment', alignment, 'hex_x', hex_x, 'hex_y', hex_y, 'parent_race_id', parent_race_id)
+      'god_id', god_id, 'alignment', alignment, 'hex_x', hex_x, 'hex_y', hex_y, 'parent_race_id', parent_race_id,
+      'status', status, 'order_type', order_type, 'purpose', purpose, 'avatar_type', avatar_type)
       order by created_seq, kind desc)
     from public.world_entities where world_id = '11111111-1111-1111-1111-111111111111'),
   'advancements', (select coalesce(jsonb_agg(jsonb_build_object('entity_id', entity_id, 'field', field,

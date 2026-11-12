@@ -15,7 +15,12 @@ export type ActKind =
   | 'foundCity'
   | 'advance'
   | 'purify'
-  | 'corrupt';
+  | 'corrupt'
+  | 'createOrder'
+  | 'commandOrder'
+  | 'createAvatar'
+  | 'commandAvatar'
+  | 'resurrectAvatar';
 
 /** What Advance, Purify and Corrupt can be aimed at: a civilization (race), a city or a region. */
 export type TargetKind = 'race' | 'city' | 'region';
@@ -99,6 +104,48 @@ export const ACT_OPTIONS: ActOption[] = [
     perHex: false,
     byTarget: { race: 'corruptCivilization', city: 'corruptCity', region: 'corruptRegion' },
   },
+  {
+    kind: 'createOrder',
+    power: 'createOrder',
+    category: 'Orders',
+    name: 'Create Order',
+    blurb:
+      'A sect, knights, thieves’ guild, brigands or pirates within a race. Your foothold among them.',
+    perHex: false,
+  },
+  {
+    kind: 'commandOrder',
+    power: 'commandOrder',
+    category: 'Orders',
+    name: 'Command Order',
+    blurb: 'Tell an order what to do. Another god’s order costs +10 (sect) or +5.',
+    perHex: false,
+  },
+  {
+    kind: 'createAvatar',
+    power: 'createAvatar',
+    category: 'Avatars',
+    name: 'Create Avatar',
+    blurb: 'A high priest, dragon, warrior or dynasty who walks the world for you.',
+    perHex: false,
+  },
+  {
+    kind: 'commandAvatar',
+    power: 'commandAvatar',
+    category: 'Avatars',
+    name: 'Command Avatar',
+    blurb:
+      'Your avatar does one great deed this turn: found a city, create an order, purify a city…',
+    perHex: false,
+  },
+  {
+    kind: 'resurrectAvatar',
+    power: 'resurrectAvatar',
+    category: 'Avatars',
+    name: 'Resurrect Avatar',
+    blurb: 'Bring back one of your slain avatars.',
+    perHex: false,
+  },
 ];
 
 /** The ruleset powers an option can cost, depending on its target. */
@@ -135,7 +182,7 @@ export function PowerPicker({
         </View>
       ))}
       <ThemedText type="small" themeColor="textSecondary">
-        Orders, avatars, armies, events and catastrophes arrive in later updates.
+        Armies, battles, events and catastrophes arrive in later updates.
       </ThemedText>
     </View>
   );

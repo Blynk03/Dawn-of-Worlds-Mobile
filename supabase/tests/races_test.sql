@@ -197,25 +197,28 @@ select pg_temp.act_as(current_setting('test.actor_user')::uuid);
 select pg_temp.expect_error(pg_temp.race('Gnomes', 5, 4), 'already lives', 'races can''t settle in a city');
 reset role;
 
--- Any god can command any race: the other god founds a city for the Dwarves on their turn.
+-- Any god with an order among a race can command it: the other god founds a city for the Dwarves on
+-- their turn (presence rules are tested in orders_test.sql).
 select pg_temp.act_as(current_setting('test.actor_user')::uuid);
 select public.end_turn(current_setting('test.w')::uuid);
 reset role;
 select pg_temp.check(pg_temp.active_god(current_setting('test.w')::uuid) <> current_setting('test.actor')::uuid,
   'the turn passes to the other god');
-update public.god_power set power = 20 where god_id = pg_temp.active_god(current_setting('test.w')::uuid);
+update public.god_power set power = 40 where god_id = pg_temp.active_god(current_setting('test.w')::uuid);
 select pg_temp.act_as(current_setting('test.waiter_user')::uuid);
+select public.create_order(current_setting('test.w')::uuid, current_setting('test.dwarves')::uuid,
+  'Wardens of the West', 'knights', 'Guard the western road');
 select public.found_city(current_setting('test.w')::uuid, current_setting('test.dwarves')::uuid,
   'Westwatch', 3, 4, 'A watchtower on the western road');
 reset role;
 select pg_temp.check(
   (select god_id = pg_temp.active_god(current_setting('test.w')::uuid) from public.world_entities
-   where name = 'Westwatch'),
-  'another god can command the race');
+   where name = 'Westwatch' and world_id = current_setting('test.w')::uuid),
+  'another god with an order among them can command the race');
 
 -- Who can see and change races and cities.
 select pg_temp.act_as(current_setting('test.waiter_user')::uuid);
-select pg_temp.check((select count(*) from public.world_entities) = 6, 'members see races, sects and cities');
+select pg_temp.check((select count(*) from public.world_entities) = 7, 'members see races, orders and cities');
 select pg_temp.expect_error($q$update public.world_entities set name = 'Hacked' where kind = 'race'$q$,
   'permission denied', 'players can''t rename races directly');
 select pg_temp.expect_error(format(

@@ -13,8 +13,17 @@ describe('mapMarkers', () => {
     expect(mapMarkers(view, gods)).toEqual([
       { index: 4 * width + 4, kind: 'race', color: '#E3B05B', label: 'Dwarves' },
       { index: 4 * width + 6, kind: 'race', color: '#E3B05B', label: 'Deep Dwarves' },
+      { index: 4 * width + 4, kind: 'avatar', color: '#E3B05B', label: 'Durin' },
       { index: 4 * width + 5, kind: 'city', color: '#E3B05B', label: 'Karak' },
     ]);
+  });
+
+  it('leaves slain avatars off the map', () => {
+    const slain = {
+      ...view,
+      avatars: view.avatars.map((a) => ({ ...a, status: 'destroyed' as const })),
+    };
+    expect(mapMarkers(slain, gods).some((m) => m.kind === 'avatar')).toBe(false);
   });
 
   it('uses a neutral color when the god is unknown, and nothing without a map', () => {

@@ -270,7 +270,10 @@ const TerrainLayer = memo(function TerrainLayer({
   );
 });
 
-/** DOW-34/35: race homelands (a circle in the creator's color) and cities (a walled square). */
+/**
+ * DOW-34/35/45: race homelands (a circle in the creator's color), avatars (a diamond) and cities
+ * (a walled square).
+ */
 const MarkerLayer = memo(function MarkerLayer({
   markers,
   mapWidth,
@@ -286,6 +289,20 @@ const MarkerLayer = memo(function MarkerLayer({
     <Svg width={width} height={height} style={StyleSheet.absoluteFill} pointerEvents="none">
       {markers.map((m) => {
         const c = hexCenter(hexFromIndex(m.index, mapWidth), HEX_SIZE);
+        if (m.kind === 'avatar') {
+          // A small diamond at the top right.
+          const x = c.x + 10;
+          const y = c.y - 8;
+          return (
+            <Polygon
+              key={`a${m.index}-${m.label}`}
+              points={`${x},${y - 5} ${x + 5},${y} ${x},${y + 5} ${x - 5},${y}`}
+              fill={m.color}
+              stroke="#FFFFFF"
+              strokeWidth={1.5}
+            />
+          );
+        }
         if (m.kind === 'race') {
           return (
             <Circle

@@ -34,7 +34,12 @@ describe('server ruleset matches the app ruleset', () => {
   it('finds the ruleset blocks in the migrations, starting with the classic rules', () => {
     expect(blocks[0]).toMatchObject({ name: 'classic' });
     expect(blocks.map((b) => b.name)).toEqual(
-      expect.arrayContaining(['classic-powers-map', 'classic-races', 'classic-civ']),
+      expect.arrayContaining([
+        'classic-powers-map',
+        'classic-races',
+        'classic-civ',
+        'classic-avatars',
+      ]),
     );
   });
 

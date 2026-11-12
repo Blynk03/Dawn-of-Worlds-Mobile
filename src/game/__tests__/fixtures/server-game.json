@@ -177,11 +177,11 @@
     "year": 500,
     "round": 2,
     "turn_order": [
-      "aaaaaaaa-0000-0000-0000-000000000001",
       "cccccccc-0000-0000-0000-000000000003",
-      "bbbbbbbb-0000-0000-0000-000000000002"
+      "bbbbbbbb-0000-0000-0000-000000000002",
+      "aaaaaaaa-0000-0000-0000-000000000001"
     ],
-    "turn_deadline": "2026-11-14T02:49:07.304538+00:00",
+    "turn_deadline": "2026-11-14T04:30:48.133462+00:00",
     "active_position": 3,
     "turn_reminded_at": null
   },
@@ -385,8 +385,8 @@
       "round": 1,
       "god_id": "aaaaaaaa-0000-0000-0000-000000000001",
       "payload": {
-        "dice": [6, 1],
-        "total": 7,
+        "dice": [2, 4],
+        "total": 6,
         "god_id": "aaaaaaaa-0000-0000-0000-000000000001",
         "purpose": "income"
       },
@@ -399,8 +399,8 @@
       "round": 1,
       "god_id": "bbbbbbbb-0000-0000-0000-000000000002",
       "payload": {
-        "dice": [3, 3],
-        "total": 6,
+        "dice": [6, 2],
+        "total": 8,
         "god_id": "bbbbbbbb-0000-0000-0000-000000000002",
         "purpose": "income"
       },
@@ -413,7 +413,7 @@
       "round": 1,
       "god_id": "cccccccc-0000-0000-0000-000000000003",
       "payload": {
-        "dice": [2, 5],
+        "dice": [1, 6],
         "total": 7,
         "god_id": "cccccccc-0000-0000-0000-000000000003",
         "purpose": "income"
@@ -423,62 +423,6 @@
     {
       "age": 1,
       "seq": 6,
-      "type": "dice_rolled",
-      "round": 1,
-      "god_id": "aaaaaaaa-0000-0000-0000-000000000001",
-      "payload": {
-        "dice": [3, 3],
-        "total": 6,
-        "god_id": "aaaaaaaa-0000-0000-0000-000000000001",
-        "purpose": "turn_order_tiebreak"
-      },
-      "created_at": "2026-11-04T00:00:00Z"
-    },
-    {
-      "age": 1,
-      "seq": 7,
-      "type": "dice_rolled",
-      "round": 1,
-      "god_id": "cccccccc-0000-0000-0000-000000000003",
-      "payload": {
-        "dice": [2, 4],
-        "total": 6,
-        "god_id": "cccccccc-0000-0000-0000-000000000003",
-        "purpose": "turn_order_tiebreak"
-      },
-      "created_at": "2026-11-04T00:00:00Z"
-    },
-    {
-      "age": 1,
-      "seq": 8,
-      "type": "dice_rolled",
-      "round": 1,
-      "god_id": "aaaaaaaa-0000-0000-0000-000000000001",
-      "payload": {
-        "dice": [6, 5],
-        "total": 11,
-        "god_id": "aaaaaaaa-0000-0000-0000-000000000001",
-        "purpose": "turn_order_tiebreak"
-      },
-      "created_at": "2026-11-04T00:00:00Z"
-    },
-    {
-      "age": 1,
-      "seq": 9,
-      "type": "dice_rolled",
-      "round": 1,
-      "god_id": "cccccccc-0000-0000-0000-000000000003",
-      "payload": {
-        "dice": [2, 1],
-        "total": 3,
-        "god_id": "cccccccc-0000-0000-0000-000000000003",
-        "purpose": "turn_order_tiebreak"
-      },
-      "created_at": "2026-11-04T00:00:00Z"
-    },
-    {
-      "age": 1,
-      "seq": 10,
       "type": "round_started",
       "round": 1,
       "god_id": null,
@@ -488,17 +432,17 @@
         "round": 1,
         "incomes": [
           {
-            "roll": 7,
-            "bonus": 0,
-            "power": 7,
-            "gained": 7,
-            "god_id": "aaaaaaaa-0000-0000-0000-000000000001"
-          },
-          {
             "roll": 6,
             "bonus": 0,
             "power": 6,
             "gained": 6,
+            "god_id": "aaaaaaaa-0000-0000-0000-000000000001"
+          },
+          {
+            "roll": 8,
+            "bonus": 0,
+            "power": 8,
+            "gained": 8,
             "god_id": "bbbbbbbb-0000-0000-0000-000000000002"
           },
           {
@@ -509,21 +453,21 @@
             "god_id": "cccccccc-0000-0000-0000-000000000003"
           }
         ],
-        "deadline": "2026-11-14T02:49:07.265144+00:00",
+        "deadline": "2026-11-14T04:30:48.080907+00:00",
         "turn_order": [
-          "aaaaaaaa-0000-0000-0000-000000000001",
+          "bbbbbbbb-0000-0000-0000-000000000002",
           "cccccccc-0000-0000-0000-000000000003",
-          "bbbbbbbb-0000-0000-0000-000000000002"
+          "aaaaaaaa-0000-0000-0000-000000000001"
         ]
       },
       "created_at": "2026-11-04T00:00:00Z"
     },
     {
       "age": 1,
-      "seq": 11,
+      "seq": 7,
       "type": "action_taken",
       "round": 1,
-      "god_id": "aaaaaaaa-0000-0000-0000-000000000001",
+      "god_id": "bbbbbbbb-0000-0000-0000-000000000002",
       "payload": {
         "cost": 9,
         "hexes": [
@@ -534,37 +478,37 @@
         "power": "shapeLand",
         "choice": "mountains",
         "description": "The Spine of the World rises",
-        "power_after": 28
+        "power_after": 29
       },
       "created_at": "2026-11-04T00:00:00Z"
     },
     {
       "age": 1,
-      "seq": 12,
+      "seq": 8,
       "type": "action_taken",
       "round": 1,
-      "god_id": "aaaaaaaa-0000-0000-0000-000000000001",
+      "god_id": "bbbbbbbb-0000-0000-0000-000000000002",
       "payload": {
         "cost": 2,
         "hexes": [[3, 2]],
         "power": "shapeClimate",
         "choice": "snow",
         "description": "Snow crowns the tallest peak",
-        "power_after": 56
+        "power_after": 57
       },
       "created_at": "2026-11-04T00:00:00Z"
     },
     {
       "age": 1,
-      "seq": 13,
+      "seq": 9,
       "type": "turn_ended",
       "round": 1,
-      "god_id": "aaaaaaaa-0000-0000-0000-000000000001",
+      "god_id": "bbbbbbbb-0000-0000-0000-000000000002",
       "payload": {
         "how": "end",
-        "power": 56,
-        "god_id": "aaaaaaaa-0000-0000-0000-000000000001",
-        "deadline": "2026-11-14T02:49:07.279958+00:00",
+        "power": 57,
+        "god_id": "bbbbbbbb-0000-0000-0000-000000000002",
+        "deadline": "2026-11-14T04:30:48.095675+00:00",
         "next_god_id": "cccccccc-0000-0000-0000-000000000003",
         "low_pool_bonus": 0
       },
@@ -572,7 +516,7 @@
     },
     {
       "age": 1,
-      "seq": 14,
+      "seq": 10,
       "type": "turn_ended",
       "round": 1,
       "god_id": "cccccccc-0000-0000-0000-000000000003",
@@ -580,22 +524,22 @@
         "how": "pass",
         "power": 7,
         "god_id": "cccccccc-0000-0000-0000-000000000003",
-        "deadline": "2026-11-14T02:49:07.281893+00:00",
-        "next_god_id": "bbbbbbbb-0000-0000-0000-000000000002",
+        "deadline": "2026-11-14T04:30:48.097823+00:00",
+        "next_god_id": "aaaaaaaa-0000-0000-0000-000000000001",
         "low_pool_bonus": 0
       },
       "created_at": "2026-11-04T00:00:00Z"
     },
     {
       "age": 1,
-      "seq": 15,
+      "seq": 11,
       "type": "turn_ended",
       "round": 1,
-      "god_id": "bbbbbbbb-0000-0000-0000-000000000002",
+      "god_id": "aaaaaaaa-0000-0000-0000-000000000001",
       "payload": {
         "how": "end",
         "power": 2,
-        "god_id": "bbbbbbbb-0000-0000-0000-000000000002",
+        "god_id": "aaaaaaaa-0000-0000-0000-000000000001",
         "deadline": null,
         "next_god_id": null,
         "low_pool_bonus": 1
@@ -604,13 +548,13 @@
     },
     {
       "age": 1,
-      "seq": 16,
+      "seq": 12,
       "type": "dice_rolled",
       "round": 2,
       "god_id": "aaaaaaaa-0000-0000-0000-000000000001",
       "payload": {
-        "dice": [6, 2],
-        "total": 8,
+        "dice": [1, 5],
+        "total": 6,
         "god_id": "aaaaaaaa-0000-0000-0000-000000000001",
         "purpose": "income"
       },
@@ -618,13 +562,13 @@
     },
     {
       "age": 1,
-      "seq": 17,
+      "seq": 13,
       "type": "dice_rolled",
       "round": 2,
       "god_id": "bbbbbbbb-0000-0000-0000-000000000002",
       "payload": {
-        "dice": [1, 4],
-        "total": 5,
+        "dice": [5, 2],
+        "total": 7,
         "god_id": "bbbbbbbb-0000-0000-0000-000000000002",
         "purpose": "income"
       },
@@ -632,13 +576,13 @@
     },
     {
       "age": 1,
-      "seq": 18,
+      "seq": 14,
       "type": "dice_rolled",
       "round": 2,
       "god_id": "cccccccc-0000-0000-0000-000000000003",
       "payload": {
-        "dice": [2, 4],
-        "total": 6,
+        "dice": [5, 4],
+        "total": 9,
         "god_id": "cccccccc-0000-0000-0000-000000000003",
         "purpose": "income"
       },
@@ -646,7 +590,7 @@
     },
     {
       "age": 1,
-      "seq": 19,
+      "seq": 15,
       "type": "round_started",
       "round": 2,
       "god_id": null,
@@ -656,42 +600,42 @@
         "round": 2,
         "incomes": [
           {
-            "roll": 8,
-            "bonus": 0,
-            "power": 64,
-            "gained": 8,
+            "roll": 6,
+            "bonus": 1,
+            "power": 9,
+            "gained": 7,
             "god_id": "aaaaaaaa-0000-0000-0000-000000000001"
           },
           {
-            "roll": 5,
-            "bonus": 1,
-            "power": 8,
-            "gained": 6,
+            "roll": 7,
+            "bonus": 0,
+            "power": 64,
+            "gained": 7,
             "god_id": "bbbbbbbb-0000-0000-0000-000000000002"
           },
           {
-            "roll": 6,
+            "roll": 9,
             "bonus": 0,
-            "power": 13,
-            "gained": 6,
+            "power": 16,
+            "gained": 9,
             "god_id": "cccccccc-0000-0000-0000-000000000003"
           }
         ],
-        "deadline": "2026-11-14T02:49:07.28315+00:00",
+        "deadline": "2026-11-14T04:30:48.099099+00:00",
         "turn_order": [
-          "aaaaaaaa-0000-0000-0000-000000000001",
           "cccccccc-0000-0000-0000-000000000003",
-          "bbbbbbbb-0000-0000-0000-000000000002"
+          "bbbbbbbb-0000-0000-0000-000000000002",
+          "aaaaaaaa-0000-0000-0000-000000000001"
         ]
       },
       "created_at": "2026-11-04T00:00:00Z"
     },
     {
       "age": 1,
-      "seq": 20,
+      "seq": 16,
       "type": "action_taken",
       "round": 2,
-      "god_id": "aaaaaaaa-0000-0000-0000-000000000001",
+      "god_id": "cccccccc-0000-0000-0000-000000000003",
       "payload": {
         "cost": 6,
         "hexes": [
@@ -701,50 +645,54 @@
         "power": "shapeLand",
         "choice": "forest",
         "description": "Old woods spread",
-        "power_after": 88
+        "power_after": 40
       },
       "created_at": "2026-11-04T00:00:00Z"
     },
     {
       "age": 1,
-      "seq": 21,
+      "seq": 17,
       "type": "action_taken",
       "round": 2,
-      "god_id": "aaaaaaaa-0000-0000-0000-000000000001",
+      "god_id": "cccccccc-0000-0000-0000-000000000003",
       "payload": {
         "cost": 22,
         "race": {
-          "id": "c798be6b-60ad-4927-afeb-9f1bb2a90bd6",
+          "id": "0e25e935-fe09-4a6c-a432-2b8a86d09dea",
           "hex": [4, 4],
           "name": "Dwarves",
           "alignment": 1,
+          "parent_id": null,
           "appearance": "Short and bearded",
           "description": "Stout folk of the deep halls"
         },
         "hexes": [[4, 4]],
         "order": {
-          "id": "57a43ccc-b347-4bad-91a9-9a6fceec6e43",
-          "name": "Faithful of Solara"
+          "id": "1c4d7c5c-9e38-4da8-9782-77e7f70af59f",
+          "name": "Faithful of Thalassa",
+          "purpose": "Worship of Thalassa",
+          "race_id": "0e25e935-fe09-4a6c-a432-2b8a86d09dea",
+          "order_type": "religious"
         },
         "power": "createRace",
         "choice": "Dwarves",
         "description": "Stout folk of the deep halls",
-        "power_after": 96
+        "power_after": 48
       },
       "created_at": "2026-11-04T00:00:00Z"
     },
     {
       "age": 1,
-      "seq": 22,
+      "seq": 18,
       "type": "action_taken",
       "round": 2,
-      "god_id": "aaaaaaaa-0000-0000-0000-000000000001",
+      "god_id": "cccccccc-0000-0000-0000-000000000003",
       "payload": {
         "city": {
-          "id": "62b2dbeb-8903-4bde-9faf-a6dfcfd66735",
+          "id": "528ba528-469f-4814-b2ee-53228246e285",
           "hex": [5, 4],
           "name": "Karak",
-          "race_id": "c798be6b-60ad-4927-afeb-9f1bb2a90bd6",
+          "race_id": "0e25e935-fe09-4a6c-a432-2b8a86d09dea",
           "alignment": 1
         },
         "cost": 8,
@@ -753,96 +701,100 @@
         "choice": "Karak",
         "intent": "foundCity",
         "description": "A hall is carved into the hill",
-        "power_after": 118
+        "power_after": 70
       },
       "created_at": "2026-11-04T00:00:00Z"
     },
     {
       "age": 1,
-      "seq": 23,
+      "seq": 19,
       "type": "action_taken",
       "round": 2,
-      "god_id": "aaaaaaaa-0000-0000-0000-000000000001",
+      "god_id": "cccccccc-0000-0000-0000-000000000003",
       "payload": {
         "cost": 12,
         "race": {
-          "id": "bec1c725-9256-43ab-86af-b8728886f4d6",
+          "id": "158bd581-26a0-45af-ac6a-df77d58469e5",
           "hex": [6, 4],
           "name": "Deep Dwarves",
           "alignment": -1,
-          "parent_id": "c798be6b-60ad-4927-afeb-9f1bb2a90bd6",
+          "parent_id": "0e25e935-fe09-4a6c-a432-2b8a86d09dea",
           "appearance": "Pale and silent",
           "description": "They delve too deep"
         },
         "hexes": [[6, 4]],
         "order": {
-          "id": "085eaa3a-da1c-442c-a6c4-af76a51cf5c9",
-          "name": "Faithful of Solara"
+          "id": "3534ba61-1bbd-4730-b091-fdab8c149d38",
+          "name": "Faithful of Thalassa",
+          "purpose": "Worship of Thalassa",
+          "race_id": "158bd581-26a0-45af-ac6a-df77d58469e5",
+          "order_type": "religious"
         },
         "power": "createSubrace",
         "choice": "Deep Dwarves",
         "description": "They delve too deep",
-        "power_after": 136
+        "power_after": 88
       },
       "created_at": "2026-11-04T00:00:00Z"
     },
     {
       "age": 1,
-      "seq": 24,
+      "seq": 20,
       "type": "action_taken",
       "round": 2,
-      "god_id": "aaaaaaaa-0000-0000-0000-000000000001",
+      "god_id": "cccccccc-0000-0000-0000-000000000003",
       "payload": {
         "cost": 10,
         "hexes": [[4, 4]],
         "power": "advanceCivilization",
         "choice": "Steel",
         "target": {
-          "id": "c798be6b-60ad-4927-afeb-9f1bb2a90bd6",
+          "id": "0e25e935-fe09-4a6c-a432-2b8a86d09dea",
           "kind": "race",
           "name": "Dwarves"
         },
         "advancement": {
-          "id": "cda0f075-0a96-4cf3-aa4c-07090b66d27d",
+          "id": "75277db4-a786-434c-bbad-176ac68c33cd",
           "field": "Steel"
         },
         "description": "The forges never cool",
-        "power_after": 156
+        "power_after": 108
       },
       "created_at": "2026-11-04T00:00:00Z"
     },
     {
       "age": 1,
-      "seq": 25,
+      "seq": 21,
       "type": "action_taken",
       "round": 2,
-      "god_id": "aaaaaaaa-0000-0000-0000-000000000001",
+      "god_id": "cccccccc-0000-0000-0000-000000000003",
       "payload": {
         "cost": 4,
         "hexes": [[5, 4]],
         "power": "purifyCity",
         "choice": "Karak",
         "target": {
-          "id": "62b2dbeb-8903-4bde-9faf-a6dfcfd66735",
-          "key": "62b2dbeb-8903-4bde-9faf-a6dfcfd66735",
+          "id": "528ba528-469f-4814-b2ee-53228246e285",
+          "key": "528ba528-469f-4814-b2ee-53228246e285",
           "kind": "city",
           "name": "Karak"
         },
         "alignment": {
           "after": 2,
-          "delta": 1
+          "delta": 1,
+          "power": "purifyCity"
         },
         "description": "Pilgrims come",
-        "power_after": 182
+        "power_after": 134
       },
       "created_at": "2026-11-04T00:00:00Z"
     },
     {
       "age": 1,
-      "seq": 26,
+      "seq": 22,
       "type": "action_taken",
       "round": 2,
-      "god_id": "aaaaaaaa-0000-0000-0000-000000000001",
+      "god_id": "cccccccc-0000-0000-0000-000000000003",
       "payload": {
         "cost": 3,
         "hexes": [[2, 2]],
@@ -856,10 +808,108 @@
         },
         "alignment": {
           "after": -1,
-          "delta": -1
+          "delta": -1,
+          "power": "corruptRegion"
         },
         "description": "A blight in the woods",
+        "power_after": 161
+      },
+      "created_at": "2026-11-04T00:00:00Z"
+    },
+    {
+      "age": 1,
+      "seq": 23,
+      "type": "action_taken",
+      "round": 2,
+      "god_id": "cccccccc-0000-0000-0000-000000000003",
+      "payload": {
+        "cost": 8,
+        "hexes": [[4, 4]],
+        "order": {
+          "id": "51104490-4d4f-4dc2-bc00-0992e872f8d9",
+          "name": "Hammers of the Deep",
+          "purpose": "Guard the mountain gates",
+          "race_id": "0e25e935-fe09-4a6c-a432-2b8a86d09dea",
+          "order_type": "knights"
+        },
+        "power": "createOrder",
+        "choice": "Hammers of the Deep",
+        "target": {
+          "id": "0e25e935-fe09-4a6c-a432-2b8a86d09dea",
+          "key": "0e25e935-fe09-4a6c-a432-2b8a86d09dea",
+          "kind": "race",
+          "name": "Dwarves"
+        },
+        "description": "Guard the mountain gates",
+        "power_after": 183
+      },
+      "created_at": "2026-11-04T00:00:00Z"
+    },
+    {
+      "age": 1,
+      "seq": 24,
+      "type": "action_taken",
+      "round": 2,
+      "god_id": "cccccccc-0000-0000-0000-000000000003",
+      "payload": {
+        "cost": 4,
+        "hexes": [[4, 4]],
+        "power": "commandOrder",
+        "choice": "Hammers of the Deep",
+        "target": {
+          "id": "51104490-4d4f-4dc2-bc00-0992e872f8d9",
+          "key": "51104490-4d4f-4dc2-bc00-0992e872f8d9",
+          "kind": "order",
+          "name": "Hammers of the Deep"
+        },
+        "surcharge": 0,
+        "description": "Ride to the border",
         "power_after": 209
+      },
+      "created_at": "2026-11-04T00:00:00Z"
+    },
+    {
+      "age": 1,
+      "seq": 25,
+      "type": "action_taken",
+      "round": 2,
+      "god_id": "cccccccc-0000-0000-0000-000000000003",
+      "payload": {
+        "cost": 10,
+        "hexes": [[4, 4]],
+        "power": "createAvatar",
+        "avatar": {
+          "id": "026d5a43-32c5-4faf-bab7-834b6083cb0f",
+          "hex": [4, 4],
+          "name": "Durin",
+          "race_id": "0e25e935-fe09-4a6c-a432-2b8a86d09dea",
+          "avatar_type": "Dwarf king",
+          "description": "The deathless king"
+        },
+        "choice": "Durin",
+        "description": "The deathless king",
+        "power_after": 229
+      },
+      "created_at": "2026-11-04T00:00:00Z"
+    },
+    {
+      "age": 1,
+      "seq": 26,
+      "type": "action_taken",
+      "round": 2,
+      "god_id": "cccccccc-0000-0000-0000-000000000003",
+      "payload": {
+        "cost": 2,
+        "hexes": [[4, 4]],
+        "power": "commandAvatar",
+        "avatar": {
+          "id": "026d5a43-32c5-4faf-bab7-834b6083cb0f",
+          "name": "Durin"
+        },
+        "choice": "Durin",
+        "intent": "deed",
+        "description": "Durin slays the wyrm of the north",
+        "power_after": 257
       },
       "created_at": "2026-11-04T00:00:00Z"
     },
@@ -868,13 +918,13 @@
       "seq": 27,
       "type": "turn_ended",
       "round": 2,
-      "god_id": "aaaaaaaa-0000-0000-0000-000000000001",
+      "god_id": "cccccccc-0000-0000-0000-000000000003",
       "payload": {
         "how": "end",
-        "power": 209,
-        "god_id": "aaaaaaaa-0000-0000-0000-000000000001",
-        "deadline": "2026-11-14T02:49:07.302382+00:00",
-        "next_god_id": "cccccccc-0000-0000-0000-000000000003",
+        "power": 257,
+        "god_id": "cccccccc-0000-0000-0000-000000000003",
+        "deadline": "2026-11-14T04:30:48.12982+00:00",
+        "next_god_id": "bbbbbbbb-0000-0000-0000-000000000002",
         "low_pool_bonus": 0
       },
       "created_at": "2026-11-04T00:00:00Z"
@@ -884,13 +934,13 @@
       "seq": 28,
       "type": "turn_ended",
       "round": 2,
-      "god_id": "cccccccc-0000-0000-0000-000000000003",
+      "god_id": "bbbbbbbb-0000-0000-0000-000000000002",
       "payload": {
         "how": "timeout",
-        "power": 13,
-        "god_id": "cccccccc-0000-0000-0000-000000000003",
-        "deadline": "2026-11-14T02:49:07.304538+00:00",
-        "next_god_id": "bbbbbbbb-0000-0000-0000-000000000002",
+        "power": 64,
+        "god_id": "bbbbbbbb-0000-0000-0000-000000000002",
+        "deadline": "2026-11-14T04:30:48.133462+00:00",
+        "next_god_id": "aaaaaaaa-0000-0000-0000-000000000001",
         "low_pool_bonus": 0
       },
       "created_at": "2026-11-04T00:00:00Z"
@@ -898,80 +948,130 @@
   ],
   "powers": {
     "aaaaaaaa-0000-0000-0000-000000000001": {
-      "power": 209,
-      "lowPoolBonus": 0
-    },
-    "bbbbbbbb-0000-0000-0000-000000000002": {
-      "power": 8,
+      "power": 9,
       "lowPoolBonus": 1
     },
+    "bbbbbbbb-0000-0000-0000-000000000002": {
+      "power": 64,
+      "lowPoolBonus": 0
+    },
     "cccccccc-0000-0000-0000-000000000003": {
-      "power": 13,
+      "power": 257,
       "lowPoolBonus": 0
     }
   },
   "entities": [
     {
-      "id": "c798be6b-60ad-4927-afeb-9f1bb2a90bd6",
+      "id": "0e25e935-fe09-4a6c-a432-2b8a86d09dea",
       "kind": "race",
       "name": "Dwarves",
       "hex_x": 4,
       "hex_y": 4,
-      "god_id": "aaaaaaaa-0000-0000-0000-000000000001",
+      "god_id": "cccccccc-0000-0000-0000-000000000003",
+      "status": "active",
+      "purpose": "",
       "race_id": null,
       "alignment": 1,
+      "order_type": null,
+      "avatar_type": null,
       "parent_race_id": null
     },
     {
-      "id": "57a43ccc-b347-4bad-91a9-9a6fceec6e43",
+      "id": "1c4d7c5c-9e38-4da8-9782-77e7f70af59f",
       "kind": "order",
-      "name": "Faithful of Solara",
+      "name": "Faithful of Thalassa",
       "hex_x": null,
       "hex_y": null,
-      "god_id": "aaaaaaaa-0000-0000-0000-000000000001",
-      "race_id": "c798be6b-60ad-4927-afeb-9f1bb2a90bd6",
+      "god_id": "cccccccc-0000-0000-0000-000000000003",
+      "status": "active",
+      "purpose": "Worship of Thalassa",
+      "race_id": "0e25e935-fe09-4a6c-a432-2b8a86d09dea",
       "alignment": 1,
+      "order_type": "religious",
+      "avatar_type": null,
       "parent_race_id": null
     },
     {
-      "id": "62b2dbeb-8903-4bde-9faf-a6dfcfd66735",
+      "id": "528ba528-469f-4814-b2ee-53228246e285",
       "kind": "city",
       "name": "Karak",
       "hex_x": 5,
       "hex_y": 4,
-      "god_id": "aaaaaaaa-0000-0000-0000-000000000001",
-      "race_id": "c798be6b-60ad-4927-afeb-9f1bb2a90bd6",
+      "god_id": "cccccccc-0000-0000-0000-000000000003",
+      "status": "active",
+      "purpose": "",
+      "race_id": "0e25e935-fe09-4a6c-a432-2b8a86d09dea",
       "alignment": 2,
+      "order_type": null,
+      "avatar_type": null,
       "parent_race_id": null
     },
     {
-      "id": "bec1c725-9256-43ab-86af-b8728886f4d6",
+      "id": "158bd581-26a0-45af-ac6a-df77d58469e5",
       "kind": "race",
       "name": "Deep Dwarves",
       "hex_x": 6,
       "hex_y": 4,
-      "god_id": "aaaaaaaa-0000-0000-0000-000000000001",
+      "god_id": "cccccccc-0000-0000-0000-000000000003",
+      "status": "active",
+      "purpose": "",
       "race_id": null,
       "alignment": -1,
-      "parent_race_id": "c798be6b-60ad-4927-afeb-9f1bb2a90bd6"
+      "order_type": null,
+      "avatar_type": null,
+      "parent_race_id": "0e25e935-fe09-4a6c-a432-2b8a86d09dea"
     },
     {
-      "id": "085eaa3a-da1c-442c-a6c4-af76a51cf5c9",
+      "id": "3534ba61-1bbd-4730-b091-fdab8c149d38",
       "kind": "order",
-      "name": "Faithful of Solara",
+      "name": "Faithful of Thalassa",
       "hex_x": null,
       "hex_y": null,
-      "god_id": "aaaaaaaa-0000-0000-0000-000000000001",
-      "race_id": "bec1c725-9256-43ab-86af-b8728886f4d6",
+      "god_id": "cccccccc-0000-0000-0000-000000000003",
+      "status": "active",
+      "purpose": "Worship of Thalassa",
+      "race_id": "158bd581-26a0-45af-ac6a-df77d58469e5",
       "alignment": -1,
+      "order_type": "religious",
+      "avatar_type": null,
+      "parent_race_id": null
+    },
+    {
+      "id": "51104490-4d4f-4dc2-bc00-0992e872f8d9",
+      "kind": "order",
+      "name": "Hammers of the Deep",
+      "hex_x": null,
+      "hex_y": null,
+      "god_id": "cccccccc-0000-0000-0000-000000000003",
+      "status": "active",
+      "purpose": "Guard the mountain gates",
+      "race_id": "0e25e935-fe09-4a6c-a432-2b8a86d09dea",
+      "alignment": 1,
+      "order_type": "knights",
+      "avatar_type": null,
+      "parent_race_id": null
+    },
+    {
+      "id": "026d5a43-32c5-4faf-bab7-834b6083cb0f",
+      "kind": "avatar",
+      "name": "Durin",
+      "hex_x": 4,
+      "hex_y": 4,
+      "god_id": "cccccccc-0000-0000-0000-000000000003",
+      "status": "active",
+      "purpose": "",
+      "race_id": "0e25e935-fe09-4a6c-a432-2b8a86d09dea",
+      "alignment": 0,
+      "order_type": null,
+      "avatar_type": "Dwarf king",
       "parent_race_id": null
     }
   ],
   "advancements": [
     {
       "field": "Steel",
-      "god_id": "aaaaaaaa-0000-0000-0000-000000000001",
-      "entity_id": "c798be6b-60ad-4927-afeb-9f1bb2a90bd6"
+      "god_id": "cccccccc-0000-0000-0000-000000000003",
+      "entity_id": "0e25e935-fe09-4a6c-a432-2b8a86d09dea"
     }
   ]
 }

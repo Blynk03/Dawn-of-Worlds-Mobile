@@ -13,10 +13,11 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import { useGame } from '@/game/hooks';
-import { alignmentLabel } from '@/game/civilization';
+import { alignmentLabel, ORDER_TYPE_NAMES } from '@/game/civilization';
 import {
   type AdvancementView,
   ageName,
+  type AvatarView,
   type CityView,
   type OrderView,
   type RaceView,
@@ -75,6 +76,19 @@ export default function AtlasScreen() {
             />
           ))
         )}
+        {view.avatars.length > 0 ? (
+          <Card style={styles.card}>
+            <ThemedText type="subtitle">Avatars</ThemedText>
+            {view.avatars.map((a) => (
+              <AvatarRow
+                key={a.id}
+                avatar={a}
+                raceName={view.races.find((r) => r.id === a.raceId)?.name ?? null}
+                creator={lobby.gods.find((g) => g.id === a.godId)}
+              />
+            ))}
+          </Card>
+        ) : null}
       </ScrollView>
     </ThemedView>
   );
@@ -147,9 +161,27 @@ function RaceCard({
         </ThemedText>
       ) : null}
       {orders.length > 0 ? (
-        <ThemedText type="small" themeColor="textSecondary">
-          Sects: {orders.map((o) => o.name).join(', ')}
-        </ThemedText>
+        <View style={styles.orders}>
+          <ThemedText type="smallBold">Orders</ThemedText>
+          {orders.map((o) => {
+            const founder = gods.find((g) => g.id === o.godId);
+            return (
+              <View key={o.id} accessibilityLabel={`Order ${o.name}`}>
+                <ThemedText type="small">
+                  <ThemedText type="smallBold">{o.name}</ThemedText>
+                  {` · ${ORDER_TYPE_NAMES[o.orderType]} · ${founder?.name ?? 'a god'}’s${
+                    o.status === 'destroyed' ? ' · wiped out' : ''
+                  }`}
+                </ThemedText>
+                {o.purpose ? (
+                  <ThemedText type="small" themeColor="textSecondary">
+                    {o.purpose}
+                  </ThemedText>
+                ) : null}
+              </View>
+            );
+          })}
+        </View>
       ) : null}
 
       <ThemedText type="smallBold">
@@ -179,6 +211,34 @@ function RaceCard({
   );
 }
 
+/** DOW-45: an avatar: who and what they are, whose they are, where they walk. */
+function AvatarRow({
+  avatar,
+  raceName,
+  creator,
+}: {
+  avatar: AvatarView;
+  raceName: string | null;
+  creator: God | undefined;
+}) {
+  return (
+    <View style={styles.avatar} accessibilityLabel={`Avatar ${avatar.name}`}>
+      <GodBadge color={creator?.color ?? null} sigil={creator?.sigil ?? null} size={28} />
+      <View style={styles.fill}>
+        <ThemedText type="smallBold">
+          {avatar.name}
+          {avatar.status === 'destroyed' ? ' (slain)' : ''}
+        </ThemedText>
+        <ThemedText type="small" themeColor="textSecondary">
+          {avatar.avatarType} · {creator?.name ?? 'a god'}’s ·{' '}
+          {raceName ? `among the ${raceName}` : `at hex ${avatar.hex.x}, ${avatar.hex.y}`}
+        </ThemedText>
+        <ThemedText type="small">{avatar.description}</ThemedText>
+      </View>
+    </View>
+  );
+}
+
 const greatestFields = (advancements: AdvancementView[], id: string) =>
   advancements.filter((a) => a.entityId === id).map((a) => a.field);
 
@@ -199,5 +259,7 @@ const styles = StyleSheet.create({
   card: { gap: Spacing.two },
   header: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   city: { gap: Spacing.half, paddingLeft: Spacing.two },
+  orders: { gap: Spacing.one },
+  avatar: { flexDirection: 'row', gap: Spacing.two, alignItems: 'flex-start' },
   cityHighlight: { borderRadius: Spacing.two, padding: Spacing.two },
 });

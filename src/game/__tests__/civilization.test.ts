@@ -4,6 +4,10 @@ import { terrainInfo } from '@/map/terrain';
 import {
   advancementsOf,
   alignmentChangedThisTurn,
+  avatarActedThisTurn,
+  avatarCreatedRace,
+  orderSurcharge,
+  presentIn,
   alignmentLabel,
   alignmentName,
   entityName,
@@ -113,5 +117,42 @@ describe('advancements (DOW-47)', () => {
     expect(entityName(view, karak.id)).toBe('Karak');
     expect(entityName(view, 'nope')).toBeNull();
     expect(entityName(view, null)).toBeNull();
+  });
+});
+
+describe('presence, surcharges and avatars (DOW-38/39/45)', () => {
+  const durin = view.avatars[0];
+  const hammers = view.orders.find((o) => o.name === 'Hammers of the Deep')!;
+  const sect = view.orders.find((o) => o.raceId === dwarves.id && o.orderType === 'religious')!;
+
+  it('knows who has an order or avatar among a race', () => {
+    expect(presentIn(view, dwarves.godId!, dwarves.id)).toBe(true);
+    expect(presentIn(view, 'stranger', dwarves.id)).toBe(false);
+  });
+
+  it('a destroyed order or slain avatar is no presence', () => {
+    const godId = hammers.godId!;
+    const gone = {
+      ...view,
+      orders: view.orders.map((o) =>
+        o.godId === godId ? { ...o, status: 'destroyed' as const } : o,
+      ),
+      avatars: view.avatars.map((a) => ({ ...a, status: 'destroyed' as const })),
+    };
+    expect(presentIn(gone, godId, dwarves.id)).toBe(false);
+    const avatarOnly = { ...gone, avatars: view.avatars };
+    expect(presentIn(avatarOnly, durin.godId!, dwarves.id)).toBe(true);
+  });
+
+  it("charges extra for commanding someone else's order", () => {
+    expect(orderSurcharge(hammers, hammers.godId!)).toBe(0);
+    expect(orderSurcharge(hammers, 'stranger')).toBe(5);
+    expect(orderSurcharge(sect, 'stranger')).toBe(10);
+  });
+
+  it('knows when an avatar has acted, and whether it used its Create Race', () => {
+    expect(avatarActedThisTurn(view, durin.id)).toBe(true); // the fixture's deed was this round
+    expect(avatarActedThisTurn({ ...view, round: view.round + 1 }, durin.id)).toBe(false);
+    expect(avatarCreatedRace(view, durin.id)).toBe(false);
   });
 });

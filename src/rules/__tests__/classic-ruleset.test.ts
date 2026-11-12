@@ -33,10 +33,16 @@ const PDF_TABLE_OF_POWERS: Record<string, [number, number, number]> = {
 };
 
 describe('Classic ruleset', () => {
-  const original = CLASSIC_RULESET.powers.filter((p) => !p.houseRule);
+  const original = CLASSIC_RULESET.powers.filter((p) => !p.houseRule && !p.source);
 
   it('has exactly the powers in the PDF Table of Powers, apart from marked house rules', () => {
     expect(original.map((p) => p.name).sort()).toEqual(Object.keys(PDF_TABLE_OF_POWERS).sort());
+  });
+
+  it('adds powers priced in the rules text, saying where', () => {
+    const fromText = CLASSIC_RULESET.powers.filter((p) => p.source);
+    expect(fromText.map((p) => [p.id, p.costs])).toEqual([['resurrectAvatar', [5, 5, 5]]]);
+    expect(fromText[0].source).toMatch(/resurrected .* for 5 points/);
   });
 
   it('only adds powers the rules describe but leave unpriced, priced like their nearest kin', () => {
