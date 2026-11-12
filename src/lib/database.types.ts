@@ -346,6 +346,33 @@ export type Database = {
         Args: { target_world: string; avatar: string; intent: string; args: Json };
         Returns: string | null;
       };
+      command_city: {
+        Args: { target_world: string; city: string; action: string; args: Json };
+        Returns: string;
+      };
+      march_army: {
+        Args: {
+          target_world: string;
+          army: string;
+          hex_x: number;
+          hex_y: number;
+          description: string;
+        };
+        Returns: undefined;
+      };
+      attack: {
+        Args: {
+          target_world: string;
+          army: string;
+          target_kind: string;
+          target: string;
+          attacker_modifiers: Json;
+          defender_modifiers: Json;
+          utterly_destroy: boolean;
+          description: string;
+        };
+        Returns: string;
+      };
       resurrect_avatar: {
         Args: { target_world: string; avatar: string; description: string };
         Returns: undefined;

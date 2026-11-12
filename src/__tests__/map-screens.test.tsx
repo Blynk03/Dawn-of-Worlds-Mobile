@@ -763,3 +763,154 @@ describe('Avatars (DOW-45)', () => {
     expect(screen.getByText('None of your avatars is slain')).toBeTruthy();
   });
 });
+
+describe('Cities and armies (DOW-48/54/55/41)', () => {
+  const [dwarves] = view.races;
+  const karak = view.cities.find((c) => c.name === 'Karak')!;
+  const host = view.armies.find((a) => a.name === 'Host of Karak')!;
+  // The active god gets an order among the Dwarves, so they can command Karak and its army.
+  const present = () => withOrder(eventsWithPower(40), activeGodId, dwarves.id);
+
+  beforeEach(() => {
+    game.loadGameEvents.mockResolvedValue(present());
+    game.commandCity.mockResolvedValue();
+    game.marchArmy.mockResolvedValue();
+    game.attack.mockResolvedValue('won');
+    game.commandAvatar.mockResolvedValue();
+  });
+
+  it('offers the new powers, priced for the age', async () => {
+    await render(<ActScreen />);
+    await screen.findByText(/has 40 power\./);
+    expect(screen.getByText('Cities and armies')).toBeTruthy();
+    for (const name of ['Command City', 'March an army', 'Attack']) {
+      expect(screen.getByRole('button', { name })).toBeEnabled();
+    }
+  });
+
+  it('builds a wall in a city', async () => {
+    await render(<ActScreen />);
+    await openPower('Command City');
+    // Underhold lies in ruins, so only Karak can be commanded.
+    expect(screen.queryByLabelText('Underhold')).toBeNull();
+    await fireEvent.press(screen.getByLabelText('hex 5,4')); // tap Karak on the map
+    await fireEvent.press(screen.getByLabelText('Wall'));
+    await fireEvent.changeText(screen.getByLabelText('What is it called?'), 'The Outer Ring');
+    await fireEvent.changeText(screen.getByLabelText('What happens?'), 'Stone on stone');
+    expect(screen.getByText('Karak builds The Outer Ring')).toBeTruthy();
+    expect(screen.getByText("Costs 6. You'll have 34 power left.")).toBeTruthy();
+    await fireEvent.press(screen.getByRole('button', { name: 'Build it' }));
+    expect(game.commandCity).toHaveBeenCalledWith('w1', karak.id, {
+      action: 'build',
+      name: 'The Outer Ring',
+      structure_type: 'wall',
+      description: 'Stone on stone',
+    });
+  });
+
+  it('raises one army per city each turn, two through an avatar', async () => {
+    const events = present();
+    const last = events[events.length - 1];
+    events.push({
+      ...last,
+      seq: last.seq + 1,
+      god_id: activeGodId,
+      payload: {
+        power: 'commandCity',
+        intent: 'raiseArmy',
+        cost: 6,
+        hexes: [[5, 4]],
+        choice: 'Second Host',
+        description: 'More',
+        power_after: 34,
+        target: { kind: 'city', id: karak.id, key: karak.id, name: 'Karak' },
+        army: {
+          id: 'army-2',
+          name: 'Second Host',
+          race_id: dwarves.id,
+          city_id: karak.id,
+          hex: [5, 4],
+        },
+      },
+    });
+    game.loadGameEvents.mockResolvedValue(withAvatar(events, activeGodId, null, 'Aelin'));
+    await render(<ActScreen />);
+    await openPower('Command City');
+    await fireEvent.press(screen.getByLabelText('Karak'));
+    await fireEvent.press(screen.getByLabelText('Raise an army'));
+    expect(screen.getByText('Karak has already raised an army this turn.')).toBeTruthy();
+    await fireEvent.press(screen.getByRole('button', { name: 'Choose another power' }));
+
+    await fireEvent.press(screen.getByRole('button', { name: 'Command Avatar' }));
+    await fireEvent.press(screen.getByLabelText('Aelin'));
+    await fireEvent.press(screen.getByLabelText('Command a city'));
+    await fireEvent.press(screen.getByLabelText('Karak'));
+    await fireEvent.press(screen.getByLabelText('Raise an army'));
+    expect(screen.queryByText(/already raised/)).toBeNull();
+    await fireEvent.changeText(screen.getByLabelText('Army name'), 'Aelin’s Riders');
+    await fireEvent.changeText(screen.getByLabelText('What happens?'), 'They follow her');
+    expect(screen.getByText("Costs 2. You'll have 32 power left.")).toBeTruthy();
+    await fireEvent.press(screen.getByRole('button', { name: 'Raise the army' }));
+    expect(game.commandAvatar).toHaveBeenCalledWith('w1', 'avatar-Aelin', {
+      intent: 'commandCity',
+      city: karak.id,
+      action: 'raiseArmy',
+      name: 'Aelin’s Riders',
+      description: 'They follow her',
+    });
+  });
+
+  it('marches an army over land', async () => {
+    await render(<ActScreen />);
+    await openPower('March an army');
+    await fireEvent.press(screen.getByLabelText('Host of Karak · 7, 4'));
+    await fireEvent.press(screen.getByLabelText('hex 0,0'));
+    expect(screen.getByText('Armies march on land; choose a land hex.')).toBeTruthy();
+    await fireEvent.press(screen.getByLabelText('hex 5,5'));
+    expect(screen.getByText('Host of Karak marches to hex 5, 5')).toBeTruthy();
+    await fireEvent.changeText(screen.getByLabelText('What happens?'), 'Home again');
+    await fireEvent.press(screen.getByRole('button', { name: 'March Host of Karak' }));
+    expect(game.marchArmy).toHaveBeenCalledWith('w1', host.id, { x: 5, y: 5 }, 'Home again');
+  });
+
+  it('attacks a city with chosen bonuses, and can utterly destroy it', async () => {
+    await render(<ActScreen />);
+    await openPower('Attack');
+    await fireEvent.press(screen.getByLabelText('Host of Karak · 7, 4'));
+    await fireEvent.press(screen.getByLabelText('hex 5,4')); // Karak
+    // Suggested: the Dwarves' Steel on both sides, and Karak's Iron Wall for the defenders.
+    await fireEvent.press(screen.getAllByLabelText('+1 Steel')[0]);
+    await fireEvent.press(screen.getByLabelText('+1 The Iron Wall'));
+    await fireEvent.changeText(
+      screen.getByLabelText('Another bonus for the attackers'),
+      'Siege engines',
+    );
+    await fireEvent.press(screen.getAllByRole('button', { name: 'Add' })[0]);
+    expect(screen.getByText('Host of Karak: 2d6 + 2')).toBeTruthy();
+    // The Host was raised in Karak, but it is the attacker: nobody is left to defend.
+    expect(screen.getByText(/Karak has no army to defend it/)).toBeTruthy();
+    await fireEvent.press(screen.getByLabelText('Utterly destroy them · up to +8 power'));
+    expect(screen.getByText("Costs 16. You'll have 24 power left.")).toBeTruthy();
+    await fireEvent.changeText(screen.getByLabelText('What happens?'), 'Brother against brother');
+    await fireEvent.press(screen.getByRole('button', { name: 'Attack Karak' }));
+    expect(game.attack).toHaveBeenCalledWith('w1', {
+      armyId: host.id,
+      target: { kind: 'city', id: karak.id },
+      attackerModifiers: ['Steel', 'Siege engines'],
+      defenderModifiers: ['The Iron Wall'],
+      utterlyDestroy: true,
+      description: 'Brother against brother',
+    });
+  });
+
+  it('needs an army you can command, and a city', async () => {
+    game.loadGameEvents.mockResolvedValue(withoutRaces(eventsWithPower(40)));
+    await render(<ActScreen />);
+    await screen.findByText(/has 40 power\./);
+    expect(screen.getByRole('button', { name: 'Attack' })).toBeDisabled();
+    expect(
+      screen.getAllByText('No army you can command: raise one with Command City'),
+    ).toHaveLength(2);
+    expect(screen.getByText('No standing cities yet')).toBeTruthy();
+  });
+});

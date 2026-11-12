@@ -18,6 +18,9 @@ export type ActKind =
   | 'corrupt'
   | 'createOrder'
   | 'commandOrder'
+  | 'commandCity'
+  | 'march'
+  | 'attack'
   | 'createAvatar'
   | 'commandAvatar'
   | 'resurrectAvatar';
@@ -122,6 +125,30 @@ export const ACT_OPTIONS: ActOption[] = [
     perHex: false,
   },
   {
+    kind: 'commandCity',
+    power: 'commandCity',
+    category: 'Cities and armies',
+    name: 'Command City',
+    blurb: 'Build a wonder, wall, school or tower, or raise an army (one per city each turn).',
+    perHex: false,
+  },
+  {
+    kind: 'march',
+    power: 'commandRace',
+    category: 'Cities and armies',
+    name: 'March an army',
+    blurb: 'Command a race to move one of its armies anywhere on land.',
+    perHex: false,
+  },
+  {
+    kind: 'attack',
+    power: 'commandRace',
+    category: 'Cities and armies',
+    name: 'Attack',
+    blurb: 'Send an army against another army or a city. 2d6 each, +1 per advantage.',
+    perHex: false,
+  },
+  {
     kind: 'createAvatar',
     power: 'createAvatar',
     category: 'Avatars',
@@ -182,7 +209,7 @@ export function PowerPicker({
         </View>
       ))}
       <ThemedText type="small" themeColor="textSecondary">
-        Armies, battles, events and catastrophes arrive in later updates.
+        Events, catastrophes and table votes on battles arrive in later updates.
       </ThemedText>
     </View>
   );

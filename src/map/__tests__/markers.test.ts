@@ -14,8 +14,26 @@ describe('mapMarkers', () => {
       { index: 4 * width + 4, kind: 'race', color: '#E3B05B', label: 'Dwarves' },
       { index: 4 * width + 6, kind: 'race', color: '#E3B05B', label: 'Deep Dwarves' },
       { index: 4 * width + 4, kind: 'avatar', color: '#E3B05B', label: 'Durin' },
+      { index: 4 * width + 7, kind: 'army', color: '#E3B05B', label: 'Host of Karak' },
       { index: 4 * width + 5, kind: 'city', color: '#E3B05B', label: 'Karak' },
+      // DOW-41: the Host of Karak took Underhold.
+      {
+        index: 4 * width + 7,
+        kind: 'city',
+        color: '#9CA3AF',
+        label: 'Underhold (ruins)',
+        ruined: true,
+      },
     ]);
+  });
+
+  it('leaves scattered armies and destroyed cities off the map', () => {
+    const after = {
+      ...view,
+      armies: view.armies.map((a) => ({ ...a, status: 'scattered' as const })),
+      cities: view.cities.map((c) => ({ ...c, status: 'destroyed' as const })),
+    };
+    expect(mapMarkers(after, gods).map((m) => m.kind)).toEqual(['race', 'race', 'avatar']);
   });
 
   it('leaves slain avatars off the map', () => {
@@ -27,7 +45,8 @@ describe('mapMarkers', () => {
   });
 
   it('uses a neutral color when the god is unknown, and nothing without a map', () => {
-    expect(mapMarkers(view, []).every((m) => m.color === '#6B7280')).toBe(true);
+    const live = mapMarkers(view, []).filter((m) => !m.ruined);
+    expect(live.every((m) => m.color === '#6B7280')).toBe(true);
     expect(mapMarkers({ ...view, map: null }, gods)).toEqual([]);
   });
 });

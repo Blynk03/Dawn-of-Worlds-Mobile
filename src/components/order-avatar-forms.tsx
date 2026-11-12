@@ -201,7 +201,8 @@ export type AvatarIntent =
   | 'commandOrder'
   | 'purifyCity'
   | 'corruptCity'
-  | 'createRace';
+  | 'createRace'
+  | 'commandCity';
 
 export const AVATAR_INTENTS: { intent: AvatarIntent; label: string }[] = [
   { intent: 'deed', label: 'A mortal deed' },
@@ -210,6 +211,7 @@ export const AVATAR_INTENTS: { intent: AvatarIntent; label: string }[] = [
   { intent: 'commandOrder', label: 'Command an order' },
   { intent: 'purifyCity', label: 'Purify a city' },
   { intent: 'corruptCity', label: 'Corrupt a city' },
+  { intent: 'commandCity', label: 'Command a city' },
   { intent: 'createRace', label: 'Create a race (once)' },
 ];
 
