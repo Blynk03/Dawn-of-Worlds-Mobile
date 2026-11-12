@@ -37,7 +37,7 @@ export default function ChronicleScreen() {
   const router = useRouter();
   const { session } = useAuth();
   const myId = session?.user.id;
-  const { view, loaded, error } = useGame(id, true);
+  const { view, loaded, error, refresh } = useGame(id, true);
   const { data: lobby } = useLobby(id);
   const social = useSocial(id);
   const now = useNow();
@@ -84,21 +84,30 @@ export default function ChronicleScreen() {
             </View>
           }
           ListEmptyComponent={<Empty />}
-          renderItem={({ item }) => (
-            <FeedCard
-              worldId={id}
-              action={item}
-              view={view}
-              gods={lobby.gods}
-              members={lobby.members}
-              myId={myId}
-              comments={social.comments}
-              reactions={social.reactions}
-              now={now}
-              onChanged={social.refresh}
-              onOpenEntity={openEntity}
-              onOpenHex={openHex}
-            />
+          renderItem={({ item, index }) => (
+            <>
+              <FeedCard
+                worldId={id}
+                action={item}
+                view={view}
+                gods={lobby.gods}
+                members={lobby.members}
+                myId={myId}
+                comments={social.comments}
+                reactions={social.reactions}
+                now={now}
+                objectionHours={lobby.world.objection_hours ?? 12}
+                onChanged={() => {
+                  social.refresh();
+                  refresh();
+                }}
+                onOpenEntity={openEntity}
+                onOpenHex={openHex}
+              />
+              {ageBegins(view.actions, view.actions.length - 1 - index) ? (
+                <AgeDivider age={item.age} />
+              ) : null}
+            </>
           )}
         />
       ) : (
@@ -217,17 +226,35 @@ function History({
       contentContainerStyle={styles.list}
       ListHeaderComponent={filters}
       ListEmptyComponent={view.actions.length === 0 ? <Empty /> : undefined}
-      renderItem={({ item }) => (
-        <HistoryRow
-          action={item}
-          view={view}
-          god={gods.find((g) => g.id === item.godId)}
-          wide={mode === 'tablet'}
-          onOpenEntity={onOpenEntity}
-          onOpenHex={onOpenHex}
-        />
+      renderItem={({ item, index }) => (
+        <>
+          {ageBegins(rows, index) ? <AgeDivider age={item.age} /> : null}
+          <HistoryRow
+            action={item}
+            view={view}
+            god={gods.find((g) => g.id === item.godId)}
+            wide={mode === 'tablet'}
+            onOpenEntity={onOpenEntity}
+            onOpenHex={onOpenHex}
+          />
+        </>
       )}
     />
+  );
+}
+
+/** DOW-52: whether actions[i] (oldest first) is the first one of a later age. */
+function ageBegins(actions: ActionRecord[], i: number): boolean {
+  return i > 0 && actions[i - 1].age < actions[i].age;
+}
+
+function AgeDivider({ age }: { age: number }) {
+  return (
+    <View style={styles.divider} accessibilityRole="header">
+      <ThemedText type="smallBold" themeColor="accent">
+        The {ageName(age)} begins
+      </ThemedText>
+    </View>
   );
 }
 
@@ -266,7 +293,10 @@ function HistoryRow({
   onOpenEntity: (id: string) => void;
   onOpenHex: (hex: { x: number; y: number }) => void;
 }) {
-  const { power, what } = describeAction(action);
+  const described = describeAction(action);
+  const power = described.power;
+  // DOW-53: undone actions stay in the chart, marked.
+  const what = action.retconned ? `${described.what} (undone)` : described.what;
   const first = action.hexes[0];
   const links = (
     <View style={styles.wrap}>
@@ -349,6 +379,7 @@ function Link({ label, a11y, onPress }: { label: string; a11y: string; onPress: 
 }
 
 const styles = StyleSheet.create({
+  divider: { alignItems: 'center', paddingVertical: Spacing.two },
   fill: { flex: 1 },
   center: { alignItems: 'center', justifyContent: 'center' },
   list: { gap: Spacing.three, padding: Spacing.three, paddingBottom: Spacing.six },

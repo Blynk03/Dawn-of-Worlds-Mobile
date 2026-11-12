@@ -15,7 +15,9 @@ import { Card, ErrorMessage, GodBadge } from '@/components/game-ui';
 import { MapThumbnail } from '@/components/map-thumbnail';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
-import { type ActionRecord, ageName, type GameView } from '@/game/project';
+import { objectToAction } from '@/game/api';
+import { type ActionRecord, ageName, describeDeadline, type GameView } from '@/game/project';
+import { canObject, objectionDeadline, objectionTo, voteCounts } from '@/game/votes';
 import { useTheme } from '@/hooks/use-theme';
 import type { CommentRow, God, ReactionRow } from '@/lib/database.types';
 import type { LobbyMember } from '@/worlds/api';
@@ -30,6 +32,8 @@ type Props = {
   comments: CommentRow[];
   reactions: ReactionRow[];
   now: Date;
+  /** DOW-53: hours after an action that others can object to it (0 = objections off). */
+  objectionHours: number;
   /** Called after this player reacts or comments, so the feed can refresh at once. */
   onChanged: () => void;
   onOpenEntity: (entityId: string) => void;
@@ -47,6 +51,7 @@ export function FeedCard({
   comments,
   reactions,
   now,
+  objectionHours,
   onChanged,
   onOpenEntity,
   onOpenHex,
@@ -126,7 +131,19 @@ export function FeedCard({
 
       <View style={styles.body}>
         <View style={[styles.fill, styles.gap]}>
-          <ThemedText>{action.description}</ThemedText>
+          <ThemedText themeColor={action.retconned ? 'textSecondary' : undefined}>
+            {action.description}
+          </ThemedText>
+          <ObjectionStatus
+            worldId={worldId}
+            action={action}
+            view={view}
+            gods={gods}
+            myGodId={gods.find((g) => g.user_id === myId)?.id ?? null}
+            hours={objectionHours}
+            now={now}
+            onChanged={onChanged}
+          />
           {action.battle ? <BattleSummary battle={action.battle} target={action.choice} /> : null}
           {entities.length > 0 ? (
             <View style={styles.row}>
@@ -240,7 +257,113 @@ function TextLink({
   );
 }
 
+/**
+ * DOW-53: whether an action was undone, the objection to it and how the vote went, or (for the
+ * other gods, inside the objection window) a way to object.
+ */
+function ObjectionStatus({
+  worldId,
+  action,
+  view,
+  gods,
+  myGodId,
+  hours,
+  now,
+  onChanged,
+}: {
+  worldId: string;
+  action: ActionRecord;
+  view: GameView;
+  gods: God[];
+  myGodId: string | null;
+  hours: number;
+  now: Date;
+  onChanged: () => void;
+}) {
+  const [writing, setWriting] = useState(false);
+  const [reason, setReason] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const objection = objectionTo(view, action.seq);
+  const godName = (id: string | null) => gods.find((g) => g.id === id)?.name ?? 'A god';
+
+  if (action.retconned && !objection) {
+    const cause = view.actions.find((a) => a.seq === action.undoneBecauseOf);
+    return (
+      <ThemedText type="smallBold" themeColor="accent">
+        Undone{cause ? ` along with “${describeAction(cause).what}”, which it built on` : ''}; its
+        cost was refunded.
+      </ThemedText>
+    );
+  }
+  if (objection) {
+    const counts = voteCounts(objection);
+    const result =
+      objection.status === 'open'
+        ? 'The gods are voting: vote on the world screen.'
+        : objection.status === 'undone'
+          ? `Undone${objection.coin ? ' on a coin flip' : ` by vote (${counts.undo} to ${counts.keep})`}; its cost was refunded.`
+          : `Kept${objection.coin ? ' on a coin flip' : ` by vote (${counts.keep} to ${counts.undo})`}.`;
+    return (
+      <View style={styles.objection}>
+        <ThemedText type="small">
+          <ThemedText type="smallBold">{godName(objection.godId)} objected:</ThemedText> “
+          {objection.reason}”
+        </ThemedText>
+        <ThemedText
+          type="smallBold"
+          themeColor={objection.status === 'undone' ? 'accent' : 'textSecondary'}>
+          {result}
+        </ThemedText>
+      </View>
+    );
+  }
+  if (!canObject(view, action, myGodId, hours, now)) return null;
+
+  const submit = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await objectToAction(worldId, action.seq, reason);
+      setWriting(false);
+      setReason('');
+      onChanged();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const closes = describeDeadline(objectionDeadline(action, hours)?.toISOString() ?? null, now);
+  return writing ? (
+    <View style={styles.objection}>
+      <TextField
+        label="Why do you object?"
+        value={reason}
+        onChangeText={setReason}
+        placeholder="That breaks what we agreed about the north…"
+        maxLength={280}
+      />
+      <ThemedText type="small" themeColor="textSecondary">
+        Every god votes to keep it, undo it, or flip a coin. Undoing it refunds it, along with
+        anything built on it.
+      </ThemedText>
+      <View style={styles.row}>
+        <Button title="Object" onPress={submit} busy={busy} disabled={!reason.trim()} />
+        <Button title="Cancel" variant="secondary" onPress={() => setWriting(false)} />
+      </View>
+      <ErrorMessage message={error} />
+    </View>
+  ) : (
+    <TextLink
+      label={`Object${closes ? ` (${closes.replace('Ends in', 'closes in')})` : ''}`}
+      onPress={() => setWriting(true)}
+    />
+  );
+}
+
 const styles = StyleSheet.create({
+  objection: { gap: Spacing.one },
   fill: { flex: 1 },
   gap: { gap: Spacing.two },
   card: { gap: Spacing.two },

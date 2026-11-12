@@ -382,3 +382,63 @@ export function subscribeToGameEvents(
     return () => {};
   }
 }
+
+/** DOW-52: propose the next age; 'passed' straight away once any one god can call it. */
+export async function proposeNextAge(worldId: string): Promise<string> {
+  const { data, error } = await client().rpc('propose_next_age', { target_world: worldId });
+  if (error) throw new Error(friendlyError(error));
+  return data;
+}
+
+/** DOW-53: object to another god's action, opening a vote on keeping or undoing it. */
+export async function objectToAction(
+  worldId: string,
+  seq: number,
+  reason: string,
+): Promise<string> {
+  const { data, error } = await client().rpc('object_to_action', {
+    target_world: worldId,
+    action_seq: seq,
+    reason,
+  });
+  if (error) throw new Error(friendlyError(error));
+  return data;
+}
+
+export type VoteChoice = 'yes' | 'no' | 'keep' | 'undo' | 'coin';
+
+/** Votes (or changes your vote). Returns the vote's status afterwards. */
+export async function castVote(
+  worldId: string,
+  proposalId: string,
+  choice: VoteChoice,
+): Promise<string> {
+  const { data, error } = await client().rpc('vote', {
+    target_world: worldId,
+    proposal: proposalId,
+    choice,
+  });
+  if (error) throw new Error(friendlyError(error));
+  return data;
+}
+
+/** Closes a vote whose time is up (anyone in the world can). */
+export async function closeVote(worldId: string, proposalId: string): Promise<string> {
+  const { data, error } = await client().rpc('close_proposal', {
+    target_world: worldId,
+    proposal: proposalId,
+  });
+  if (error) throw new Error(friendlyError(error));
+  return data;
+}
+
+/** The host's setting: hours after an action that others can object to it (0 = off). */
+export const OBJECTION_OPTIONS = [0, 1, 6, 12, 24, 48] as const;
+
+export async function setObjectionHours(worldId: string, hours: number): Promise<void> {
+  const { error } = await client()
+    .from('worlds')
+    .update({ objection_hours: hours })
+    .eq('id', worldId);
+  if (error) throw new Error(friendlyError(error));
+}

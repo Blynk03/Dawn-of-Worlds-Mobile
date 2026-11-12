@@ -73,7 +73,38 @@ export type ActionRecord = HexChange & {
   year: number;
   /** When it was logged (ISO time). */
   at: string;
+  /** DOW-53: undone after an objection (it stays in the log, marked, and was refunded). */
+  retconned: boolean;
+  /** The undone action this was undone along with, because it built on it. */
+  undoneBecauseOf: number | null;
 };
+
+/** DOW-52/53: a vote: on moving to the next age, or on an objection to an action. */
+export type ProposalView = {
+  id: string;
+  kind: 'advanceAge' | 'objection';
+  /** Who proposed or objected. */
+  godId: string | null;
+  /** An objection's action. */
+  targetSeq: number | null;
+  /** The age proposed. */
+  age: number | null;
+  /** A single god calling the age after its tenth round (no vote). */
+  solo: boolean;
+  reason: string;
+  /** When an objection's vote closes (ISO time); age votes last until the round ends. */
+  closesAt: string | null;
+  status: 'open' | 'passed' | 'failed' | 'expired' | 'kept' | 'undone';
+  /** Each god's vote: yes / no on an age, keep / undo / coin on an objection. */
+  votes: Record<string, string>;
+  /** The server's coin flip, if it came to that: 1 keeps, 2 undoes. */
+  coin: number | null;
+  seq: number;
+  at: string;
+};
+
+/** DOW-52: when an age began. */
+export type AgeChange = { age: number; name: string; round: number; seq: number };
 
 export type ActionTarget = {
   kind: 'race' | 'city' | 'region' | 'order' | 'avatar' | 'army';
@@ -217,6 +248,18 @@ export type GameView = {
   armies: ArmyView[];
   structures: StructureView[];
   advancements: AdvancementView[];
+  /** DOW-52/53: every vote, oldest first. */
+  proposals: ProposalView[];
+  /** The round the current age began in. */
+  ageStartedRound: number;
+  /** The next age has been agreed and begins with the next round. */
+  agePending: boolean;
+  /** When each age after the first began. */
+  ageChanges: AgeChange[];
+  /** seqs of undone actions; their effects are left out of the view. */
+  retconned: number[];
+  /** Every event applied, so the view can be rebuilt when an action is undone. */
+  log: GameEvent[];
   /** seq of the current round's round_started event. */
   roundStartSeq: number;
   /** Highest seq applied, so new events can be applied incrementally. */
@@ -245,6 +288,12 @@ export const EMPTY_GAME: GameView = {
   avatars: [],
   armies: [],
   structures: [],
+  proposals: [],
+  ageStartedRound: 1,
+  agePending: false,
+  ageChanges: [],
+  retconned: [],
+  log: [],
   roundStartSeq: 0,
   lastSeq: 0,
 };
@@ -258,7 +307,7 @@ const str = (v: unknown) => (typeof v === 'string' ? v : null);
 export function applyEvent(view: GameView, event: GameEvent): GameView {
   if (event.seq <= view.lastSeq) return view;
   const p = asObj(event.payload);
-  const next: GameView = { ...view, lastSeq: event.seq };
+  const next: GameView = { ...view, lastSeq: event.seq, log: [...view.log, event] };
 
   switch (event.type) {
     case 'game_started': {
@@ -386,8 +435,21 @@ export function applyEvent(view: GameView, event: GameEvent): GameView {
           typeof asObj(p.alignment).after === 'number' ? num(asObj(p.alignment).after) : null,
         year: view.year,
         at: event.created_at,
+        retconned: view.retconned.includes(event.seq),
+        undoneBecauseOf: null,
       };
       next.actions = [...view.actions, action];
+      if (event.god_id) {
+        next.powers = {
+          ...view.powers,
+          [event.god_id]: {
+            power: num(p.power_after, view.powers[event.god_id]?.power ?? 0),
+            lowPoolBonus: view.powers[event.god_id]?.lowPoolBonus ?? 0,
+          },
+        };
+      }
+      // DOW-53: an undone action is listed, but changed nothing.
+      if (action.retconned) return next;
       const origin: Origin = {
         godId: event.god_id,
         createdSeq: event.seq,
@@ -559,15 +621,6 @@ export function applyEvent(view: GameView, event: GameEvent): GameView {
           next.cities = next.cities.map((c) => (c.id === id ? { ...c, alignment: after } : c));
         }
       }
-      if (event.god_id) {
-        next.powers = {
-          ...view.powers,
-          [event.god_id]: {
-            power: num(p.power_after, view.powers[event.god_id]?.power ?? 0),
-            lowPoolBonus: view.powers[event.god_id]?.lowPoolBonus ?? 0,
-          },
-        };
-      }
       if (view.map) {
         const layer =
           action.power === 'shapeLand'
@@ -597,6 +650,97 @@ export function applyEvent(view: GameView, event: GameEvent): GameView {
       return next;
     }
 
+    case 'proposal_opened': {
+      const id = str(p.proposal_id);
+      if (!id) return next;
+      next.proposals = [
+        ...view.proposals,
+        {
+          id,
+          kind: p.kind === 'objection' ? 'objection' : 'advanceAge',
+          godId: event.god_id,
+          targetSeq: typeof p.target_seq === 'number' ? p.target_seq : null,
+          age: typeof p.age === 'number' ? p.age : null,
+          solo: p.solo === true,
+          reason: str(p.reason) ?? '',
+          closesAt: str(p.closes_at),
+          status: 'open',
+          votes: {},
+          coin: null,
+          seq: event.seq,
+          at: event.created_at,
+        },
+      ];
+      return next;
+    }
+
+    case 'vote_cast': {
+      const id = str(p.proposal_id);
+      const choice = str(p.choice);
+      if (!id || !choice || !event.god_id) return next;
+      const god = event.god_id;
+      next.proposals = view.proposals.map((x) =>
+        x.id === id ? { ...x, votes: { ...x.votes, [god]: choice } } : x,
+      );
+      return next;
+    }
+
+    case 'proposal_resolved': {
+      const id = str(p.proposal_id);
+      const outcome = PROPOSAL_STATUSES.find((o) => o === p.outcome) ?? 'expired';
+      next.proposals = view.proposals.map((x) =>
+        x.id === id
+          ? { ...x, status: outcome, coin: typeof p.coin === 'number' ? p.coin : null }
+          : x,
+      );
+      if (p.kind === 'advance_age' && outcome === 'passed') next.agePending = true;
+      return next;
+    }
+
+    case 'age_advanced': {
+      const age = num(p.age, view.age + 1);
+      const round = num(p.round, view.round + 1);
+      return {
+        ...next,
+        age,
+        agePending: false,
+        ageStartedRound: round,
+        ageChanges: [
+          ...view.ageChanges,
+          { age, name: str(p.name) ?? `Age ${age}`, round, seq: event.seq },
+        ],
+      };
+    }
+
+    case 'action_retconned': {
+      // DOW-53: rebuild the view without the undone action's effects (and refund it).
+      const seq = num(p.seq);
+      const base = view.retconned.includes(seq)
+        ? next
+        : {
+            ...view.log.reduce(applyEvent, { ...EMPTY_GAME, retconned: [...view.retconned, seq] }),
+            lastSeq: event.seq,
+            log: next.log,
+          };
+      const because = typeof p.because_of === 'number' ? p.because_of : null;
+      const god = event.god_id;
+      return {
+        ...base,
+        actions: base.actions.map((a) =>
+          a.seq === seq ? { ...a, retconned: true, undoneBecauseOf: because } : a,
+        ),
+        powers: god
+          ? {
+              ...base.powers,
+              [god]: {
+                power: num(p.power_after, base.powers[god]?.power ?? 0),
+                lowPoolBonus: base.powers[god]?.lowPoolBonus ?? 0,
+              },
+            }
+          : base.powers,
+      };
+    }
+
     default:
       // Unknown event types (from newer app versions) are skipped, not fatal.
       return next;
@@ -604,8 +748,24 @@ export function applyEvent(view: GameView, event: GameEvent): GameView {
 }
 
 export function projectWorld(events: readonly GameEvent[], from: GameView = EMPTY_GAME): GameView {
-  return [...events].sort((a, b) => a.seq - b.seq).reduce(applyEvent, from);
+  const sorted = [...events].sort((a, b) => a.seq - b.seq);
+  // Actions undone later in this batch are known up front, so they never need a rebuild.
+  const undone = sorted
+    .filter((e) => e.type === 'action_retconned')
+    .map((e) => num(asObj(e.payload).seq))
+    .filter((seq) => seq > from.lastSeq && !from.retconned.includes(seq));
+  const start = undone.length > 0 ? { ...from, retconned: [...from.retconned, ...undone] } : from;
+  return sorted.reduce(applyEvent, start);
 }
+
+const PROPOSAL_STATUSES: ProposalView['status'][] = [
+  'open',
+  'passed',
+  'failed',
+  'expired',
+  'kept',
+  'undone',
+];
 
 function targetOf(v: unknown): ActionTarget | null {
   const t = asObj(v);

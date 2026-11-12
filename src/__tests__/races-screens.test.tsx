@@ -57,6 +57,7 @@ beforeEach(() => {
       invite_code: 'ABC234',
       turn_time_limit_hours: null,
       reminder_hours: 24,
+      objection_hours: 12,
       created_by: 'u-Solara',
       created_at: '',
       updated_at: '',

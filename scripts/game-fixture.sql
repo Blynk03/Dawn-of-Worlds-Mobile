@@ -162,6 +162,21 @@ select pg_temp.act_sql('11111111-1111-1111-1111-111111111111', $q$
     'The Host brings the Deep Dwarves to heel')$q$);
 drop function public._roll_die(int);
 alter function public._roll_die_real(int) rename to _roll_die;
+-- DOW-53: a stray hill, objected to and undone.
+select pg_temp.act('11111111-1111-1111-1111-111111111111', 'shapeLand', '[[0,7]]', 'hills', 'A stray hill');
+reset role;
+select set_config('fx.hill', (select max(seq)::text from public.world_events
+  where world_id = '11111111-1111-1111-1111-111111111111' and type = 'action_taken'), false);
+select set_config('fx.actor_user', (select g.user_id::text from public.world_state s join public.gods g
+  on g.id = s.turn_order[s.active_position] where s.world_id = '11111111-1111-1111-1111-111111111111'), false);
+select set_config('fx.other_user', (select g.user_id::text from public.gods g
+  where g.world_id = '11111111-1111-1111-1111-111111111111'
+  and g.user_id::text <> current_setting('fx.actor_user') order by g.created_at limit 1), false);
+select pg_temp.act_as(current_setting('fx.other_user')::uuid);
+select set_config('fx.objection', public.object_to_action('11111111-1111-1111-1111-111111111111',
+  current_setting('fx.hill')::int, 'That hill is in my sea')::text, false);
+select pg_temp.act_as(current_setting('fx.actor_user')::uuid);
+select public.vote('11111111-1111-1111-1111-111111111111', current_setting('fx.objection')::uuid, 'undo');
 select pg_temp.play('11111111-1111-1111-1111-111111111111', false, false);
 reset role;
 update public.world_state set turn_deadline = now() - interval '1 minute'

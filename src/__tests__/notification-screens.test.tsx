@@ -3,6 +3,7 @@ import * as Notifications from 'expo-notifications';
 
 import WorldSettingsScreen from '@/app/(app)/world/[id]/settings';
 import type { World } from '@/lib/database.types';
+import * as gameApi from '@/game/api';
 import * as notificationsApi from '@/notifications/api';
 import * as push from '@/notifications/push';
 import { PushHandler } from '@/notifications/push-handler';
@@ -22,6 +23,10 @@ jest.mock('@/auth/auth-provider', () => ({
   useAuth: () => ({ session: { user: { id: mockUser } } }),
 }));
 jest.mock('@/worlds/api');
+jest.mock('@/game/api', () => ({
+  OBJECTION_OPTIONS: [0, 1, 6, 12, 24, 48],
+  setObjectionHours: jest.fn(),
+}));
 jest.mock('@/notifications/api', () => ({
   ...jest.requireActual('@/notifications/api'),
   loadWorldMuted: jest.fn(),
@@ -52,6 +57,7 @@ const world: World = {
   invite_code: 'ABC234',
   turn_time_limit_hours: null,
   reminder_hours: 24,
+  objection_hours: 12,
   created_by: 'u-host',
   created_at: '',
   updated_at: '',
@@ -101,21 +107,35 @@ describe('World settings (DOW-16/28)', () => {
 
   it('lets the host choose when slow turns get a reminder', async () => {
     await render(<WorldSettingsScreen />);
-    expect((await screen.findByLabelText('24 hours')).props.accessibilityState).toMatchObject({
+    // The first set of chips is reminders; the second, objections.
+    expect((await screen.findAllByLabelText('24 hours'))[0].props.accessibilityState).toMatchObject(
+      { checked: true },
+    );
+    await fireEvent.press(screen.getAllByLabelText('12 hours')[0]);
+    expect(api.setReminderHours).toHaveBeenCalledWith('w1', 12);
+    await fireEvent.press(screen.getAllByLabelText('Off')[0]);
+    expect(api.setReminderHours).toHaveBeenCalledWith('w1', 0);
+  });
+
+  it('lets the host choose the objection window (DOW-53)', async () => {
+    await render(<WorldSettingsScreen />);
+    expect(await screen.findByText('Objections')).toBeTruthy();
+    expect(screen.getAllByLabelText('12 hours')[1].props.accessibilityState).toMatchObject({
       checked: true,
     });
-    await fireEvent.press(screen.getByLabelText('12 hours'));
-    expect(api.setReminderHours).toHaveBeenCalledWith('w1', 12);
-    await fireEvent.press(screen.getByLabelText('Off'));
-    expect(api.setReminderHours).toHaveBeenCalledWith('w1', 0);
+    await fireEvent.press(screen.getByLabelText('1 hour'));
+    expect(jest.mocked(gameApi).setObjectionHours).toHaveBeenCalledWith('w1', 1);
+    await fireEvent.press(screen.getAllByLabelText('Off')[1]);
+    expect(jest.mocked(gameApi).setObjectionHours).toHaveBeenCalledWith('w1', 0);
   });
 
   it('shows other players the reminder setting without changing it', async () => {
     mockUser = 'u-bob';
     await render(<WorldSettingsScreen />);
-    expect(await screen.findByText(/The host chooses this\./)).toBeTruthy();
-    await fireEvent.press(screen.getByLabelText('12 hours'));
+    expect(await screen.findAllByText(/The host chooses this\./)).toHaveLength(2);
+    for (const chip of screen.getAllByLabelText('12 hours')) await fireEvent.press(chip);
     expect(api.setReminderHours).not.toHaveBeenCalled();
+    expect(jest.mocked(gameApi).setObjectionHours).not.toHaveBeenCalled();
   });
 
   it.each([
