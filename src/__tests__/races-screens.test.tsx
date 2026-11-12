@@ -77,7 +77,13 @@ describe('Atlas (DOW-34/35)', () => {
     expect(screen.getByText('Stout folk of the deep halls')).toBeTruthy();
     expect(screen.getByText('Appearance: Short and bearded')).toBeTruthy();
     expect(screen.getByText('Homeland: hex 4, 4')).toBeTruthy();
-    expect(screen.getAllByText('Sects: Faithful of Solara')).toHaveLength(2); // Dwarves, Deep Dwarves
+    // Each race's creator has a sect in it; the Dwarves also have an order of knights.
+    for (const sect of view.orders.filter((o) => o.orderType === 'religious')) {
+      expect(screen.getAllByLabelText(`Order ${sect.name}`).length).toBeGreaterThan(0);
+    }
+    expect(screen.getByLabelText('Order Hammers of the Deep')).toBeTruthy();
+    expect(screen.getByText(/· Knights · Solara’s/)).toBeTruthy();
+    expect(screen.getByText('Guard the mountain gates')).toBeTruthy();
     expect(screen.getByText('1 city')).toBeTruthy();
     expect(screen.getByLabelText('City of Karak')).toBeTruthy();
     expect(screen.getByText('“A hall is carved into the hill”')).toBeTruthy();
@@ -104,6 +110,16 @@ describe('Atlas: subraces, alignment and advancements (DOW-43/46/47)', () => {
     // Karak was founded Good (+1), then purified.
     expect(await screen.findByText(/Hex 5, 4 · Noble \(\+2\) · founded at/)).toBeTruthy();
     expect(screen.getByText('Greatest in the world at Steel')).toBeTruthy();
+  });
+});
+
+describe('Atlas: avatars (DOW-45)', () => {
+  it('lists avatars with what they are, whose they are and where they walk', async () => {
+    await render(<AtlasScreen />);
+    const durin = await screen.findByLabelText('Avatar Durin');
+    expect(durin).toBeTruthy();
+    expect(screen.getByText('Dwarf king · Solara’s · among the Dwarves')).toBeTruthy();
+    expect(screen.getByText('The deathless king')).toBeTruthy();
   });
 });
 

@@ -316,6 +316,40 @@ export type Database = {
         };
         Returns: string;
       };
+      create_order: {
+        Args: {
+          target_world: string;
+          race: string;
+          order_name: string;
+          order_type: string;
+          purpose: string;
+        };
+        Returns: string;
+      };
+      command_order: {
+        Args: { target_world: string; target_order: string; directive: string };
+        Returns: undefined;
+      };
+      create_avatar: {
+        Args: {
+          target_world: string;
+          avatar_name: string;
+          avatar_type: string;
+          description: string;
+          race: string | null;
+          hex_x: number;
+          hex_y: number;
+        };
+        Returns: string;
+      };
+      command_avatar: {
+        Args: { target_world: string; avatar: string; intent: string; args: Json };
+        Returns: string | null;
+      };
+      resurrect_avatar: {
+        Args: { target_world: string; avatar: string; description: string };
+        Returns: undefined;
+      };
       create_subrace: {
         Args: {
           target_world: string;

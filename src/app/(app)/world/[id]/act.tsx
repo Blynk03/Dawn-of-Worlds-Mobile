@@ -12,6 +12,13 @@ import {
   type TargetKind,
 } from '@/components/act-forms';
 import { AdvancementPicker, TargetPicker } from '@/components/civ-forms';
+import {
+  AvatarCommandPicker,
+  AvatarFields,
+  type AvatarIntent,
+  OrderFields,
+  OrderPicker,
+} from '@/components/order-avatar-forms';
 import { useAuth } from '@/auth/auth-provider';
 import { Button, TextField } from '@/components/form';
 import { Chip, ErrorMessage, SectionLabel } from '@/components/game-ui';
@@ -22,20 +29,28 @@ import { Spacing } from '@/constants/theme';
 import {
   advance,
   changeAlignment,
+  commandAvatar,
+  commandOrder,
+  createAvatar,
+  createOrder,
   createRace,
   createSubrace,
   foundCity,
+  resurrectAvatar,
   takeAction,
 } from '@/game/api';
 import {
   alignmentChangedThisTurn,
   alignmentLabel,
+  avatarActedThisTurn,
   greatestAt,
+  orderSurcharge,
+  presentIn,
   regionAlignmentName,
   subraceCandidates,
 } from '@/game/civilization';
 import { useGame } from '@/game/hooks';
-import { ageName, cityCandidates, settlementsAt } from '@/game/project';
+import { ageName, cityCandidates, type OrderType, settlementsAt } from '@/game/project';
 import { useLayoutMode } from '@/hooks/use-layout-mode';
 import { SIDE_PANEL_WIDTH } from '@/layout/breakpoints';
 import { type Hex, hexFromIndex, hexIndex, neighbors } from '@/map/hex';
@@ -47,6 +62,18 @@ import type { Age } from '@/rules/schema';
 import { useLobby } from '@/worlds/hooks';
 
 const MAX_HEXES = 64;
+
+/** Which form to show: a power's own, or (for Command Avatar) the one its action uses. */
+type FormKind = ActKind | 'deed';
+const INTENT_FORM: Record<AvatarIntent, FormKind> = {
+  deed: 'deed',
+  foundCity: 'foundCity',
+  createOrder: 'createOrder',
+  commandOrder: 'commandOrder',
+  purifyCity: 'purify',
+  corruptCity: 'corrupt',
+  createRace: 'createRace',
+};
 const isWater = (terrain: string) => terrainInfo(terrain).water;
 
 type RaceDraft = {
@@ -91,6 +118,29 @@ export default function ActScreen() {
   const [targetId, setTargetId] = useState<string | null>(null);
   const [field, setField] = useState('');
   const [customField, setCustomField] = useState(false);
+  // Orders
+  const [orderDraft, setOrderDraft] = useState<{
+    name: string;
+    orderType: OrderType;
+    purpose: string;
+  }>({ name: '', orderType: 'religious', purpose: '' });
+  const [orderId, setOrderId] = useState<string | null>(null);
+  // Avatars
+  const [avatarDraft, setAvatarDraft] = useState<{
+    name: string;
+    avatarType: string;
+    description: string;
+    raceId: string | null;
+  }>({ name: '', avatarType: 'High priest', description: '', raceId: null });
+  const [avatarId, setAvatarId] = useState<string | null>(null);
+  const [avatarIntent, setAvatarIntent] = useState<AvatarIntent | null>(null);
+  // Command Avatar runs another power's form, for the price of Command Avatar.
+  const viaAvatar = kind === 'commandAvatar';
+  const fk: FormKind | null = viaAvatar
+    ? avatarId && avatarIntent
+      ? INTENT_FORM[avatarIntent]
+      : null
+    : kind;
 
   const [description, setDescription] = useState('');
   const [note, setNote] = useState<string | null>(null);
@@ -100,8 +150,15 @@ export default function ActScreen() {
   const map = view.map;
   const gods = lobby?.gods;
   const markers = useMemo(() => (gods ? mapMarkers(view, gods) : []), [view, gods]);
-  const chosenRace = raceId ?? view.races[0]?.id ?? null;
   const activeGod = lobby?.gods.find((g) => g.id === view.activeGodId);
+  // Founding a city yourself needs presence (DOW-38), so start with a race where you have it.
+  const needsPresence = fk === 'foundCity' && !viaAvatar;
+  const chosenRace =
+    raceId ??
+    (needsPresence && activeGod
+      ? view.races.find((r) => presentIn(view, activeGod.id, r.id))?.id
+      : view.races[0]?.id) ??
+    null;
   const blocked = useMemo(
     () => (activeGod ? alignmentChangedThisTurn(view, activeGod.id) : new Set<string>()),
     [view, activeGod],
@@ -111,14 +168,14 @@ export default function ActScreen() {
     const { width, height } = view.map;
     const near = (h: Hex) => neighbors(h, width, height);
     const index = (h: Hex) => h.y * width + h.x;
-    if (kind === 'foundCity' && chosenRace) {
+    if (fk === 'foundCity' && chosenRace) {
       return new Set(cityCandidates(view, chosenRace, isWater, near));
     }
-    if (kind === 'createSubrace' && chosenRace) {
+    if (fk === 'createSubrace' && chosenRace) {
       return new Set(subraceCandidates(view, chosenRace, isWater, near));
     }
-    if (kind === 'advance' || kind === 'purify' || kind === 'corrupt') {
-      const aligning = kind !== 'advance';
+    if (fk === 'advance' || fk === 'purify' || fk === 'corrupt') {
+      const aligning = fk !== 'advance';
       if (targetKind === 'race') {
         return new Set(
           view.races.filter((r) => !aligning || !blocked.has(r.id)).map((r) => index(r.hex)),
@@ -131,7 +188,7 @@ export default function ActScreen() {
       }
     }
     return undefined;
-  }, [kind, chosenRace, view, targetKind, blocked]);
+  }, [fk, chosenRace, view, targetKind, blocked]);
 
   const myTurn = !!activeGod && activeGod.user_id === session?.user.id;
 
@@ -165,8 +222,25 @@ export default function ActScreen() {
       disabledReasons[o.kind] = `Needs ${low} power${o.perHex ? ' per hex' : ''}`;
     }
   }
+  costLabels.commandOrder = `${priceOf('commandOrder')}+`;
+  const me = activeGod.id;
+  const myAvatars = view.avatars.filter((a) => a.godId === me);
+  if (!view.races.some((r) => presentIn(view, me, r.id))) {
+    disabledReasons.foundCity = 'You need an order or avatar among a race first';
+  }
+  if (!view.orders.some((o) => o.status === 'active')) {
+    disabledReasons.commandOrder = 'No orders yet: create one first';
+  }
+  if (myAvatars.length === 0) {
+    disabledReasons.commandAvatar = 'You have no avatars yet';
+  } else if (!myAvatars.some((a) => a.status === 'active' && !avatarActedThisTurn(view, a.id))) {
+    disabledReasons.commandAvatar = 'Your avatars have all acted (or are slain)';
+  }
+  if (!myAvatars.some((a) => a.status !== 'active')) {
+    disabledReasons.resurrectAvatar = 'None of your avatars is slain';
+  }
   if (view.races.length === 0) {
-    for (const k of ['foundCity', 'createSubrace', 'advance'] as const) {
+    for (const k of ['foundCity', 'createSubrace', 'advance', 'createOrder'] as const) {
       disabledReasons[k] = 'No races yet: create one first';
     }
   }
@@ -181,6 +255,9 @@ export default function ActScreen() {
     setField('');
     setCustomField(false);
     setTargetKind(view.races.length > 0 || next === 'advance' ? 'race' : 'region');
+    setOrderId(null);
+    setAvatarId(null);
+    setAvatarIntent(null);
     if (next === 'shapeLand') setChoice('mountains');
     if (next === 'shapeClimate') setChoice('rain');
   };
@@ -188,26 +265,28 @@ export default function ActScreen() {
   const onTapHex = (tapped: Hex) => {
     const index = hexIndex(tapped, map.width);
     setNote(null);
-    if (kind === 'shapeLand' || kind === 'shapeClimate') {
+    if (fk === 'shapeLand' || fk === 'shapeClimate') {
       setSelected((current) => {
         const next = new Set(current);
         if (next.has(index)) next.delete(index);
         else if (next.size < MAX_HEXES) next.add(index);
         return next;
       });
-    } else if (kind === 'createRace') {
+    } else if (fk === 'createRace') {
       const here = settlementsAt(view, tapped);
       if (isWater(map.terrain[index] ?? '')) setNote('That hex is water; choose land.');
       else if (here.race || here.city) setNote('Someone already lives there.');
       else setHex(index === hex ? null : index);
-    } else if (kind === 'foundCity') {
+    } else if (fk === 'foundCity') {
       if (candidates?.has(index)) setHex(index === hex ? null : index);
       else setNote('Choose a highlighted hex, on or next to the race’s land.');
-    } else if (kind === 'createSubrace') {
+    } else if (fk === 'createSubrace') {
       if (candidates?.has(index)) setHex(index === hex ? null : index);
       else setNote('Choose a highlighted hex, next to the parent race’s land.');
-    } else if (kind === 'advance' || kind === 'purify' || kind === 'corrupt') {
-      const aligning = kind !== 'advance';
+    } else if (fk === 'createAvatar') {
+      setHex(index === hex ? null : index);
+    } else if (fk === 'advance' || fk === 'purify' || fk === 'corrupt') {
+      const aligning = fk !== 'advance';
       if (targetKind === 'region') {
         if (blocked.has(`${tapped.x},${tapped.y}`)) {
           setNote('You’ve already changed that region’s alignment this turn.');
@@ -228,13 +307,20 @@ export default function ActScreen() {
     }
   };
 
-  const shaping = kind === 'shapeLand' || kind === 'shapeClimate';
+  const shaping = fk === 'shapeLand' || fk === 'shapeClimate';
   const count = shaping ? selected.size : hex === null ? 0 : 1;
   const current = ACT_OPTIONS.find((o) => o.kind === kind);
   const currentPower = current ? (current.byTarget?.[targetKind] ?? current.power) : null;
-  const cost = currentPower
-    ? getActionCost(CLASSIC_RULESET, currentPower, age, shaping ? Math.max(count, 1) : 1)
-    : 0;
+  const chosenOrder = view.orders.find((o) => o.id === orderId);
+  const surcharge =
+    fk === 'commandOrder' && !viaAvatar && chosenOrder ? orderSurcharge(chosenOrder, me) : 0;
+  const cost = viaAvatar
+    ? priceOf('commandAvatar')
+    : currentPower
+      ? getActionCost(CLASSIC_RULESET, currentPower, age, shaping ? Math.max(count, 1) : 1) +
+        surcharge
+      : 0;
+  const avatar = view.avatars.find((a) => a.id === avatarId);
   const targetName =
     targetKind === 'region'
       ? null
@@ -314,7 +400,7 @@ export default function ActScreen() {
             run(() =>
               takeAction(
                 id,
-                kind,
+                kind === 'shapeLand' ? 'shapeLand' : 'shapeClimate',
                 [...selected].map((i) => {
                   const h = hexFromIndex(i, map.width);
                   return [h.x, h.y] as [number, number];
@@ -329,7 +415,7 @@ export default function ActScreen() {
         />
       </>
     );
-  } else if (kind === 'createRace') {
+  } else if (fk === 'createRace') {
     form = (
       <>
         <RaceFields
@@ -349,38 +435,55 @@ export default function ActScreen() {
         <Button
           title="Create the race"
           onPress={() =>
-            run(() =>
-              createRace(id, {
-                name: race.name,
-                description: race.description,
-                appearance: race.appearance,
-                alignment: race.alignment,
-                hex: hexFromIndex(hex!, map.width),
-              }),
-            )
+            run(() => {
+              const at = hexFromIndex(hex!, map.width);
+              return viaAvatar
+                ? commandAvatar(id, avatarId!, {
+                    intent: 'createRace',
+                    name: race.name,
+                    description: race.description,
+                    appearance: race.appearance,
+                    alignment: race.alignment,
+                    x: at.x,
+                    y: at.y,
+                  })
+                : createRace(id, {
+                    name: race.name,
+                    description: race.description,
+                    appearance: race.appearance,
+                    alignment: race.alignment,
+                    hex: at,
+                  });
+            })
           }
           busy={busy}
           disabled={hex === null || !affordable || !race.name.trim() || !race.description.trim()}
         />
       </>
     );
-  } else if (kind === 'foundCity') {
+  } else if (fk === 'foundCity') {
     const raceName = view.races.find((r) => r.id === chosenRace)?.name ?? 'the race';
     form = (
       <>
         <SectionLabel>Race</SectionLabel>
         <View style={styles.wrap}>
-          {view.races.map((r) => (
-            <Chip
-              key={r.id}
-              label={r.name}
-              selected={chosenRace === r.id}
-              onPress={() => {
-                setRaceId(r.id);
-                setHex(null);
-              }}
-            />
-          ))}
+          {view.races.map((r) => {
+            // DOW-38: commanding a race needs an order or avatar among it (an avatar founding
+            // the city is there itself).
+            const absent = !viaAvatar && !presentIn(view, me, r.id);
+            return (
+              <Chip
+                key={r.id}
+                label={absent ? `${r.name} · no order or avatar here` : r.name}
+                selected={chosenRace === r.id}
+                disabled={absent}
+                onPress={() => {
+                  setRaceId(r.id);
+                  setHex(null);
+                }}
+              />
+            );
+          })}
         </View>
         <TextField
           label="City name"
@@ -403,9 +506,19 @@ export default function ActScreen() {
         <Button
           title="Found the city"
           onPress={() =>
-            run(() =>
-              foundCity(id, chosenRace!, cityName, hexFromIndex(hex!, map.width), description),
-            )
+            run(() => {
+              const at = hexFromIndex(hex!, map.width);
+              return viaAvatar
+                ? commandAvatar(id, avatarId!, {
+                    intent: 'foundCity',
+                    race: chosenRace!,
+                    name: cityName,
+                    x: at.x,
+                    y: at.y,
+                    description,
+                  })
+                : foundCity(id, chosenRace!, cityName, at, description);
+            })
           }
           busy={busy}
           disabled={
@@ -414,7 +527,7 @@ export default function ActScreen() {
         />
       </>
     );
-  } else if (kind === 'createSubrace') {
+  } else if (fk === 'createSubrace') {
     const parentName = view.races.find((r) => r.id === chosenRace)?.name ?? 'the parent race';
     form = (
       <>
@@ -470,7 +583,7 @@ export default function ActScreen() {
         />
       </>
     );
-  } else if (kind === 'advance') {
+  } else if (fk === 'advance') {
     const holder = field.trim() ? greatestAt(view, field) : null;
     form = (
       <>
@@ -518,8 +631,8 @@ export default function ActScreen() {
         />
       </>
     );
-  } else if (kind === 'purify' || kind === 'corrupt') {
-    const direction = kind === 'purify' ? 1 : -1;
+  } else if (fk === 'purify' || fk === 'corrupt') {
+    const direction = fk === 'purify' ? 1 : -1;
     const before =
       targetKind === 'region'
         ? hex !== null
@@ -529,14 +642,14 @@ export default function ActScreen() {
             ? view.races.find((r) => r.id === targetId)?.alignment
             : view.cities.find((c) => c.id === targetId)?.alignment) ?? 0);
     const after = before + direction;
-    const verb = kind === 'purify' ? 'Purify' : 'Corrupt';
+    const verb = fk === 'purify' ? 'Purify' : 'Corrupt';
     const name =
       targetKind === 'region' && hex !== null ? `the region at ${hexLabel(hex)}` : targetName;
     form = (
       <>
         <TargetPicker
           view={view}
-          kinds={['race', 'city', 'region']}
+          kinds={viaAvatar ? ['city'] : ['race', 'city', 'region']}
           kind={targetKind}
           onKind={(k) => {
             setTargetKind(k);
@@ -568,18 +681,226 @@ export default function ActScreen() {
           title={name ? `${verb} ${name}` : verb}
           onPress={() =>
             run(() =>
-              changeAlignment(
-                id,
-                targetKind === 'region'
-                  ? { kind: 'region', hex: hexFromIndex(hex!, map.width) }
-                  : { kind: targetKind, id: targetId! },
-                direction,
-                description,
-              ),
+              viaAvatar
+                ? commandAvatar(id, avatarId!, {
+                    intent: direction === 1 ? 'purifyCity' : 'corruptCity',
+                    city: targetId!,
+                    description,
+                  })
+                : changeAlignment(
+                    id,
+                    targetKind === 'region'
+                      ? { kind: 'region', hex: hexFromIndex(hex!, map.width) }
+                      : { kind: targetKind, id: targetId! },
+                    direction,
+                    description,
+                  ),
             )
           }
           busy={busy}
           disabled={!targetChosen || !affordable || !description.trim()}
+        />
+      </>
+    );
+  }
+
+  if (fk === 'createOrder') {
+    const raceName = view.races.find((r) => r.id === chosenRace)?.name;
+    form = (
+      <>
+        <SectionLabel>Within</SectionLabel>
+        <View style={styles.wrap}>
+          {view.races.map((r) => (
+            <Chip
+              key={r.id}
+              label={r.name}
+              selected={chosenRace === r.id}
+              onPress={() => setRaceId(r.id)}
+            />
+          ))}
+        </View>
+        <OrderFields
+          {...orderDraft}
+          onChange={(patch) => setOrderDraft((d) => ({ ...d, ...patch }))}
+        />
+        <CostSummary
+          headline={
+            raceName
+              ? `${orderDraft.name.trim() || 'A new order'} among the ${raceName}`
+              : 'Choose a race.'
+          }
+          cost={cost}
+          power={myPower}
+          ready={!!raceName}
+        />
+        <Button
+          title="Create the order"
+          onPress={() =>
+            run(() =>
+              viaAvatar
+                ? commandAvatar(id, avatarId!, {
+                    intent: 'createOrder',
+                    race: chosenRace!,
+                    name: orderDraft.name,
+                    order_type: orderDraft.orderType,
+                    purpose: orderDraft.purpose,
+                  })
+                : createOrder(
+                    id,
+                    chosenRace!,
+                    orderDraft.name,
+                    orderDraft.orderType,
+                    orderDraft.purpose,
+                  ),
+            )
+          }
+          busy={busy}
+          disabled={
+            !raceName || !orderDraft.name.trim() || !orderDraft.purpose.trim() || !affordable
+          }
+        />
+      </>
+    );
+  } else if (fk === 'commandOrder') {
+    form = (
+      <>
+        <OrderPicker
+          view={view}
+          godId={me}
+          orderId={orderId}
+          onPick={setOrderId}
+          baseCost={viaAvatar ? cost : priceOf('commandOrder')}
+          viaAvatar={viaAvatar}
+        />
+        <CostSummary
+          headline={chosenOrder ? `Command ${chosenOrder.name}` : 'Choose an order.'}
+          cost={cost}
+          power={myPower}
+          ready={!!chosenOrder}
+        />
+        <TextField
+          label="What do they do?"
+          value={description}
+          onChangeText={setDescription}
+          placeholder="Ride to the border…"
+          maxLength={280}
+          multiline
+          style={styles.multiline}
+        />
+        <Button
+          title={chosenOrder ? `Command ${chosenOrder.name}` : 'Command the order'}
+          onPress={() =>
+            run(() =>
+              viaAvatar
+                ? commandAvatar(id, avatarId!, {
+                    intent: 'commandOrder',
+                    order: orderId!,
+                    directive: description,
+                  })
+                : commandOrder(id, orderId!, description),
+            )
+          }
+          busy={busy}
+          disabled={!chosenOrder || !description.trim() || !affordable}
+        />
+      </>
+    );
+  } else if (fk === 'createAvatar') {
+    form = (
+      <>
+        <AvatarFields
+          view={view}
+          {...avatarDraft}
+          onChange={(patch) => setAvatarDraft((d) => ({ ...d, ...patch }))}
+        />
+        <CostSummary
+          headline={
+            hex === null
+              ? 'Tap a hex on the map for where they are.'
+              : `${avatarDraft.name.trim() || 'Your avatar'} appears at ${hexLabel(hex)}`
+          }
+          cost={cost}
+          power={myPower}
+          ready={hex !== null}
+        />
+        <Button
+          title="Create the avatar"
+          onPress={() =>
+            run(() =>
+              createAvatar(id, {
+                name: avatarDraft.name,
+                avatarType: avatarDraft.avatarType,
+                description: avatarDraft.description,
+                raceId: avatarDraft.raceId,
+                hex: hexFromIndex(hex!, map.width),
+              }),
+            )
+          }
+          busy={busy}
+          disabled={
+            hex === null ||
+            !avatarDraft.name.trim() ||
+            !avatarDraft.avatarType.trim() ||
+            !avatarDraft.description.trim() ||
+            !affordable
+          }
+        />
+      </>
+    );
+  } else if (fk === 'deed') {
+    form = (
+      <>
+        <CostSummary
+          headline={`${avatar?.name ?? 'Your avatar'} acts in the world.`}
+          cost={cost}
+          power={myPower}
+          ready
+        />
+        <TextField
+          label={`What does ${avatar?.name ?? 'your avatar'} do?`}
+          value={description}
+          onChangeText={setDescription}
+          placeholder="Leads an army, slays a beast, takes a throne…"
+          maxLength={280}
+          multiline
+          style={styles.multiline}
+        />
+        <Button
+          title={`Command ${avatar?.name ?? 'the avatar'}`}
+          onPress={() => run(() => commandAvatar(id, avatarId!, { intent: 'deed', description }))}
+          busy={busy}
+          disabled={!description.trim() || !affordable}
+        />
+      </>
+    );
+  } else if (fk === 'resurrectAvatar') {
+    const slain = myAvatars.filter((a) => a.status !== 'active');
+    const chosen = slain.find((a) => a.id === avatarId);
+    form = (
+      <>
+        <SectionLabel>Slain avatar</SectionLabel>
+        <View style={styles.wrap}>
+          {slain.map((a) => (
+            <Chip
+              key={a.id}
+              label={a.name}
+              selected={avatarId === a.id}
+              onPress={() => setAvatarId(a.id)}
+            />
+          ))}
+        </View>
+        <CostSummary
+          headline={chosen ? `${chosen.name} returns.` : 'Choose who returns.'}
+          cost={cost}
+          power={myPower}
+          ready={!!chosen}
+        />
+        <DescriptionField value={description} onChange={setDescription} />
+        <Button
+          title={chosen ? `Resurrect ${chosen.name}` : 'Resurrect'}
+          onPress={() => run(() => resurrectAvatar(id, avatarId!, description))}
+          busy={busy}
+          disabled={!chosen || !description.trim() || !affordable}
         />
       </>
     );
@@ -603,6 +924,25 @@ export default function ActScreen() {
             </View>
           </View>
           <Button title="Choose another power" variant="secondary" onPress={() => pick(null)} />
+          {viaAvatar ? (
+            <AvatarCommandPicker
+              view={view}
+              godId={me}
+              avatarId={avatarId}
+              onAvatar={(a) => {
+                setAvatarId(a);
+                setAvatarIntent(null);
+              }}
+              intent={avatarIntent}
+              onIntent={(i) => {
+                setAvatarIntent(i);
+                setHex(null);
+                setTargetId(null);
+                setNote(null);
+                if (i === 'purifyCity' || i === 'corruptCity') setTargetKind('city');
+              }}
+            />
+          ) : null}
           {note ? <ErrorMessage message={note} /> : null}
           {form}
           <ErrorMessage message={error} />
@@ -613,7 +953,12 @@ export default function ActScreen() {
     </ScrollView>
   );
 
-  const pickedHex = kind === 'advance' || kind === 'purify' || kind === 'corrupt' ? targetHex : hex;
+  const pickedHex =
+    fk === 'advance' || fk === 'purify' || fk === 'corrupt'
+      ? targetHex
+      : fk === 'commandOrder' || fk === 'deed' || fk === 'resurrectAvatar' || fk === 'createOrder'
+        ? null
+        : hex;
   const mapSelection = shaping ? selected : pickedHex === null ? undefined : new Set([pickedHex]);
   const mapView = (
     <View style={styles.fill}>

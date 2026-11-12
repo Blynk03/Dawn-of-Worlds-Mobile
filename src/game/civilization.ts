@@ -1,6 +1,6 @@
 // DOW-43/46/47: rules helpers for subraces, alignment and advancements. Pure functions over the
 // projected game; they mirror the server's checks so the app only offers moves it will accept.
-import type { AdvancementView, GameView } from './project';
+import type { AdvancementView, GameView, OrderView } from './project';
 
 type Hex = { x: number; y: number };
 
@@ -115,3 +115,55 @@ export function entityName(view: GameView, id: string | null | undefined): strin
     view.races.find((r) => r.id === id)?.name ?? view.cities.find((c) => c.id === id)?.name ?? null
   );
 }
+
+/**
+ * DOW-38 (Table of Powers footnote **): whether a god has an order or an avatar, still
+ * standing, among a race, which they need to command it.
+ */
+export function presentIn(view: GameView, godId: string, raceId: string): boolean {
+  return (
+    view.orders.some((o) => o.godId === godId && o.raceId === raceId && o.status === 'active') ||
+    view.avatars.some((a) => a.godId === godId && a.raceId === raceId && a.status === 'active')
+  );
+}
+
+/** DOW-39: commanding someone else's order costs +10 (religious) or +5 (any other). */
+export function orderSurcharge(order: OrderView, godId: string): number {
+  if (order.godId === godId) return 0;
+  return order.orderType === 'religious' ? 10 : 5;
+}
+
+/** Whether an avatar has already acted this turn (it acts once a turn). */
+export function avatarActedThisTurn(view: GameView, avatarId: string): boolean {
+  return view.actions.some(
+    (a) =>
+      a.power === 'commandAvatar' &&
+      a.avatar?.id === avatarId &&
+      a.age === view.age &&
+      a.round === view.round,
+  );
+}
+
+/** Whether an avatar has used its one Create Race. */
+export function avatarCreatedRace(view: GameView, avatarId: string): boolean {
+  return view.actions.some((a) => a.avatar?.id === avatarId && a.intent === 'createRace');
+}
+
+export const ORDER_TYPE_NAMES: Record<OrderView['orderType'], string> = {
+  religious: 'Religious sect',
+  knights: 'Knights',
+  thieves: 'Thieves’ guild',
+  brigands: 'Brigands',
+  pirates: 'Pirates',
+  other: 'Other',
+};
+
+/** Suggested kinds of avatar, from the rules. Anything else can be typed in. */
+export const AVATAR_SUGGESTIONS = [
+  'High priest',
+  'Dragon',
+  'Warrior',
+  'Dynasty',
+  'Prophet',
+  'Hero',
+] as const;

@@ -18,7 +18,34 @@ export const POWER_NAMES: Record<string, string> = {
   corruptCity: 'Corrupt City',
   purifyRegion: 'Purify Region',
   corruptRegion: 'Corrupt Region',
+  createOrder: 'Create Order',
+  commandOrder: 'Command Order',
+  createAvatar: 'Create Avatar',
+  commandAvatar: 'Command Avatar',
+  resurrectAvatar: 'Resurrect Avatar',
 };
+
+/** What an avatar did when commanded (DOW-45). */
+function avatarDeed(action: ActionRecord, name: string): string {
+  const now =
+    action.alignmentAfter !== null ? `, now ${alignmentLabel(action.alignmentAfter)}` : '';
+  switch (action.intent) {
+    case 'foundCity':
+      return `${name} founds ${action.choice}`;
+    case 'createOrder':
+      return `${name} creates the order ${action.choice}`;
+    case 'commandOrder':
+      return `${name} commands ${action.choice}`;
+    case 'purifyCity':
+      return `${name} purifies ${action.choice}${now}`;
+    case 'corruptCity':
+      return `${name} corrupts ${action.choice}${now}`;
+    case 'createRace':
+      return `${name} creates the ${action.choice}`;
+    default:
+      return `${name}, a mortal deed`;
+  }
+}
 
 /**
  * e.g. { power: 'Shape Land', what: 'Hills' }, { power: 'Command Race', what: 'founded Karak' },
@@ -30,7 +57,10 @@ export function describeAction(action: ActionRecord): { power: string; what: str
   let what = action.choice;
   if (action.power === 'shapeLand') what = terrainInfo(action.choice).name;
   else if (action.power === 'shapeClimate') what = climateInfo(action.choice).name;
-  else if (action.intent === 'foundCity') what = `founded ${action.choice}`;
+  else if (action.power === 'commandAvatar' && action.avatar) {
+    what = avatarDeed(action, action.avatar.name);
+  } else if (action.intent === 'foundCity') what = `founded ${action.choice}`;
+  else if (action.power === 'resurrectAvatar') what = `${action.choice} returns`;
   else if (action.power.startsWith('advance') && action.target) {
     what = `${action.target.name}, the greatest at ${action.choice}`;
   } else if (/^(purify|corrupt)/.test(action.power) && action.alignmentAfter !== null) {
@@ -64,6 +94,15 @@ export function actionEntities(view: GameView, action: ActionRecord): EntityRef[
   }
   // Advance, Purify, Corrupt: the race or city they were aimed at.
   if (action.target?.kind === 'race') raceRef(action.target.id);
+  if (action.target?.kind === 'order') {
+    raceRef(view.orders.find((o) => o.id === action.target!.id)?.raceId ?? null);
+  }
+  // Orders and avatars: the race they belong to.
+  for (const order of view.orders) {
+    if (order.createdSeq === action.seq) raceRef(order.raceId);
+  }
+  const avatar = view.avatars.find((a) => a.id === action.avatar?.id);
+  if (avatar) raceRef(avatar.raceId);
   if (action.target?.kind === 'city') {
     const city = view.cities.find((c) => c.id === action.target!.id);
     if (city) {

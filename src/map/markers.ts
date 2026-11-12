@@ -3,7 +3,7 @@ import type { GameView } from '@/game/project';
 /** Something settled on a hex: a race's homeland or a city. */
 export type MapMarker = {
   index: number;
-  kind: 'race' | 'city';
+  kind: 'race' | 'city' | 'avatar';
   /** The color of the god who created the race (cities share their race's color). */
   color: string;
   label: string;
@@ -11,7 +11,7 @@ export type MapMarker = {
 
 const FALLBACK_COLOR = '#6B7280';
 
-/** DOW-34/35: the map markers for every race homeland and city, in their creators' colors. */
+/** DOW-34/35/45: the map markers for every race homeland, avatar and city, in their creators' colors. */
 export function mapMarkers(
   view: GameView,
   gods: readonly { id: string; color: string }[],
@@ -29,6 +29,15 @@ export function mapMarkers(
       color: colorOf(r.godId),
       label: r.name,
     })),
+    // DOW-45: avatars still walking the world.
+    ...view.avatars
+      .filter((a) => a.status === 'active')
+      .map((a): MapMarker => ({
+        index: index(a.hex),
+        kind: 'avatar',
+        color: colorOf(a.godId),
+        label: a.name,
+      })),
     ...view.cities.map((c): MapMarker => ({
       index: index(c.hex),
       kind: 'city',

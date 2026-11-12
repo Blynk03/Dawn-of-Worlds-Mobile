@@ -56,7 +56,77 @@ describe('projectWorld against a game played by the server', () => {
       ['advanceCivilization', 'Steel', 10],
       ['purifyCity', 'Karak', 4],
       ['corruptRegion', 'the region at 2, 2', 3],
+      ['createOrder', 'Hammers of the Deep', 8],
+      ['commandOrder', 'Hammers of the Deep', 4],
+      ['createAvatar', 'Durin', 10],
+      ['commandAvatar', 'Durin', 2],
     ]);
+  });
+
+  it("matches the server's orders, with their kind, purpose and creator (DOW-44)", () => {
+    expect(
+      view.orders.map((o) => ({
+        id: o.id,
+        name: o.name,
+        race_id: o.raceId,
+        god_id: o.godId,
+        order_type: o.orderType,
+        purpose: o.purpose,
+        status: o.status,
+      })),
+    ).toEqual(
+      fixture.entities
+        .filter((e) => e.kind === 'order')
+        .map((e) => ({
+          id: e.id,
+          name: e.name,
+          race_id: e.race_id,
+          god_id: e.god_id,
+          order_type: e.order_type,
+          purpose: e.purpose,
+          status: e.status,
+        })),
+    );
+  });
+
+  it("matches the server's avatars and knows which avatar acted (DOW-45)", () => {
+    expect(
+      view.avatars.map((a) => [a.id, a.name, a.avatarType, a.raceId, a.hex.x, a.hex.y, a.status]),
+    ).toEqual(
+      fixture.entities
+        .filter((e) => e.kind === 'avatar')
+        .map((e) => [e.id, e.name, e.avatar_type, e.race_id, e.hex_x, e.hex_y, e.status]),
+    );
+    const deed = byPower('commandAvatar');
+    expect(deed).toMatchObject({
+      intent: 'deed',
+      avatar: { id: view.avatars[0].id, name: 'Durin' },
+      description: 'Durin slays the wyrm of the north',
+    });
+    expect(byPower('createAvatar').avatar).toEqual({ id: view.avatars[0].id, name: 'Durin' });
+  });
+
+  it('brings a slain avatar back when it is resurrected', () => {
+    const durin = view.avatars[0];
+    const slain = { ...view, avatars: [{ ...durin, status: 'destroyed' as const }] };
+    const last = events[events.length - 1];
+    const back = applyEvent(slain, {
+      ...last,
+      seq: last.seq + 1,
+      type: 'action_taken',
+      god_id: durin.godId,
+      payload: {
+        power: 'resurrectAvatar',
+        cost: 5,
+        hexes: [[4, 4]],
+        choice: 'Durin',
+        description: 'He returns',
+        power_after: 1,
+        target: { kind: 'avatar', id: durin.id, key: durin.id, name: 'Durin' },
+        avatar: { id: durin.id, name: 'Durin', status: 'active' },
+      },
+    });
+    expect(back.avatars[0].status).toBe('active');
   });
 
   const byPower = (power: string) => view.actions.find((a) => a.power === power)!;

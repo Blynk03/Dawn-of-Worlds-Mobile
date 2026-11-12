@@ -139,7 +139,7 @@ describe('Activity feed (DOW-37)', () => {
     expect(await screen.findByText('Solara · Command Race: founded Karak')).toBeTruthy();
     expect(cards()).toHaveLength(actions.length);
     const text = (i: number) => cards()[i].props.children.join('');
-    expect(text(0)).toContain('Corrupt Region: the region at 2, 2, now Blighted');
+    expect(text(0)).toContain('Command Avatar: Durin, a mortal deed');
     expect(text(feedIndex(karakAction.seq))).toContain('founded Karak');
     expect(text(feedIndex(raceAction.seq))).toContain('Create Race: Dwarves');
     expect(feedIndex(karakAction.seq)).toBeLessThan(feedIndex(raceAction.seq));
@@ -249,7 +249,8 @@ describe('History Chart (DOW-36)', () => {
     await render(<ChronicleScreen />);
     await screen.findByText(`${actions.length} entries`);
     await fireEvent.press(screen.getByLabelText('Dwarves'));
-    expect(screen.getByText('5 entries')).toBeTruthy(); // with Karak, its subrace and advancement
+    // With Karak, its subrace, advancement, order and avatar.
+    expect(screen.getByText('9 entries')).toBeTruthy();
     await fireEvent.press(screen.getByLabelText('Karak (city)'));
     expect(screen.getByText('2 entries')).toBeTruthy(); // founded, then purified
     await fireEvent.press(screen.getByLabelText('Everything'));

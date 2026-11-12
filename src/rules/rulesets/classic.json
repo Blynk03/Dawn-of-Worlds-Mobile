@@ -139,6 +139,13 @@
       "oncePerTargetPerTurn": true
     },
     {
+      "id": "resurrectAvatar",
+      "name": "Resurrect Avatar",
+      "category": "avatars",
+      "costs": [5, 5, 5],
+      "source": "Create Avatar: \"If slain or wiped out, they may be resurrected or reestablished by the creating player for 5 points.\""
+    },
+    {
       "id": "purifyRegion",
       "name": "Purify Region (+1 alignment)",
       "category": "alignment",
