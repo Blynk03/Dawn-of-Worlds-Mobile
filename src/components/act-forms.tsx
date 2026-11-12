@@ -7,7 +7,18 @@ import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 /** The powers the composer offers, in the order shown. `power` is the ruleset id that sets the cost. */
-export type ActKind = 'shapeLand' | 'shapeClimate' | 'createRace' | 'foundCity';
+export type ActKind =
+  | 'shapeLand'
+  | 'shapeClimate'
+  | 'createRace'
+  | 'createSubrace'
+  | 'foundCity'
+  | 'advance'
+  | 'purify'
+  | 'corrupt';
+
+/** What Advance, Purify and Corrupt can be aimed at: a civilization (race), a city or a region. */
+export type TargetKind = 'race' | 'city' | 'region';
 
 export type ActOption = {
   kind: ActKind;
@@ -16,6 +27,8 @@ export type ActOption = {
   name: string;
   blurb: string;
   perHex: boolean;
+  /** When the price depends on the target, the ruleset power for each kind of target. */
+  byTarget?: Partial<Record<TargetKind, string>>;
 };
 
 export const ACT_OPTIONS: ActOption[] = [
@@ -44,6 +57,14 @@ export const ACT_OPTIONS: ActOption[] = [
     perHex: false,
   },
   {
+    kind: 'createSubrace',
+    power: 'createSubrace',
+    category: 'Races',
+    name: 'Create Subrace',
+    blurb: 'A splinter group of an existing race, starting next to its ancestors’ land.',
+    perHex: false,
+  },
+  {
     kind: 'foundCity',
     power: 'commandRace',
     category: 'Races',
@@ -51,7 +72,39 @@ export const ACT_OPTIONS: ActOption[] = [
     blurb: 'Command a race to build a city on or next to its land.',
     perHex: false,
   },
+  {
+    kind: 'advance',
+    power: 'advanceCity',
+    category: 'Civilizations',
+    name: 'Advance',
+    blurb: 'Make a race or city the greatest in the world at something, for as long as it lasts.',
+    perHex: false,
+    byTarget: { race: 'advanceCivilization', city: 'advanceCity' },
+  },
+  {
+    kind: 'purify',
+    power: 'purifyCity',
+    category: 'Alignment',
+    name: 'Purify',
+    blurb: '+1 alignment for a civilization, city or region. Once per target each turn.',
+    perHex: false,
+    byTarget: { race: 'purifyCivilization', city: 'purifyCity', region: 'purifyRegion' },
+  },
+  {
+    kind: 'corrupt',
+    power: 'corruptCity',
+    category: 'Alignment',
+    name: 'Corrupt',
+    blurb: '−1 alignment for a civilization, city or region. Once per target each turn.',
+    perHex: false,
+    byTarget: { race: 'corruptCivilization', city: 'corruptCity', region: 'corruptRegion' },
+  },
 ];
+
+/** The ruleset powers an option can cost, depending on its target. */
+export function optionPowers(option: ActOption): string[] {
+  return option.byTarget ? Object.values(option.byTarget) : [option.power];
+}
 
 /** DOW-26: powers grouped by category, with this age's cost; ones you can't use say why. */
 export function PowerPicker({
@@ -59,7 +112,8 @@ export function PowerPicker({
   disabledReasons,
   onPick,
 }: {
-  costs: Record<ActKind, number>;
+  /** What each option costs in this age, e.g. "3 / hex", "22", "4–5". */
+  costs: Record<ActKind, string>;
   disabledReasons: Partial<Record<ActKind, string>>;
   onPick: (kind: ActKind) => void;
 }) {
@@ -81,7 +135,7 @@ export function PowerPicker({
         </View>
       ))}
       <ThemedText type="small" themeColor="textSecondary">
-        Avatars, orders, events and more arrive in later updates.
+        Orders, avatars, armies, events and catastrophes arrive in later updates.
       </ThemedText>
     </View>
   );
@@ -94,7 +148,7 @@ function PowerRow({
   onPress,
 }: {
   option: ActOption;
-  cost: number;
+  cost: string;
   disabledReason?: string;
   onPress: () => void;
 }) {
@@ -119,10 +173,7 @@ function PowerRow({
           {disabledReason ?? option.blurb}
         </ThemedText>
       </View>
-      <ThemedText type="smallBold">
-        {cost}
-        {option.perHex ? ' / hex' : ''}
-      </ThemedText>
+      <ThemedText type="smallBold">{cost}</ThemedText>
     </Pressable>
   );
 }

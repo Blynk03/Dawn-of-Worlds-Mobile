@@ -19,6 +19,8 @@ export const PowerSchema = z.object({
   requiresPresence: z.boolean().optional(),
   /** Only once per target per turn (Table of Powers footnote *). */
   oncePerTargetPerTurn: z.boolean().optional(),
+  /** Set when the price isn't from the original rules, saying where it comes from. */
+  houseRule: z.string().optional(),
 });
 
 export const RulesetSchema = z

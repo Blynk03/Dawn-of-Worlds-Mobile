@@ -139,6 +139,22 @@
       "oncePerTargetPerTurn": true
     },
     {
+      "id": "purifyRegion",
+      "name": "Purify Region (+1 alignment)",
+      "category": "alignment",
+      "costs": [4, 3, 3],
+      "oncePerTargetPerTurn": true,
+      "houseRule": "The rules let gods purify a 1\" region but give no price; priced like a city."
+    },
+    {
+      "id": "corruptRegion",
+      "name": "Corrupt Region (-1 alignment)",
+      "category": "alignment",
+      "costs": [3, 2, 2],
+      "oncePerTargetPerTurn": true,
+      "houseRule": "The rules let gods corrupt a 1\" region but give no price; priced like a city."
+    },
+    {
       "id": "event",
       "name": "Event",
       "category": "fate",

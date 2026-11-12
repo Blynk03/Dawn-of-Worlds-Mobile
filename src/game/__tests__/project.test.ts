@@ -52,7 +52,51 @@ describe('projectWorld against a game played by the server', () => {
       ['shapeLand', 'forest', 6],
       ['createRace', 'Dwarves', 22],
       ['commandRace', 'Karak', 8],
+      ['createSubrace', 'Deep Dwarves', 12],
+      ['advanceCivilization', 'Steel', 10],
+      ['purifyCity', 'Karak', 4],
+      ['corruptRegion', 'the region at 2, 2', 3],
     ]);
+  });
+
+  const byPower = (power: string) => view.actions.find((a) => a.power === power)!;
+
+  it('knows subraces and their lineage (DOW-43)', () => {
+    const [dwarves, deep] = view.races;
+    expect(deep).toMatchObject({
+      name: 'Deep Dwarves',
+      parentId: dwarves.id,
+      alignment: -1,
+      hex: { x: 6, y: 4 },
+      appearance: 'Pale and silent',
+    });
+    expect(dwarves.parentId).toBeNull();
+    expect(
+      fixture.entities.filter((e) => e.parent_race_id).map((e) => [e.name, e.parent_race_id]),
+    ).toEqual([['Deep Dwarves', dwarves.id]]);
+    // The subrace's creator gets a sect, like a race's.
+    expect(view.orders.filter((o) => o.raceId === deep.id)).toHaveLength(1);
+  });
+
+  it('knows who is the greatest in the world at what (DOW-47)', () => {
+    expect(
+      view.advancements.map((a) => ({ entity_id: a.entityId, field: a.field, god_id: a.godId })),
+    ).toEqual(fixture.advancements);
+    expect(byPower('advanceCivilization').target).toMatchObject({ kind: 'race', name: 'Dwarves' });
+  });
+
+  it('follows alignment changes to cities and regions (DOW-46)', () => {
+    const fromServer = (name: string) => fixture.entities.find((e) => e.name === name)!.alignment;
+    expect(view.cities[0].alignment).toBe(fromServer('Karak'));
+    expect(view.races.map((r) => r.alignment)).toEqual(view.races.map((r) => fromServer(r.name)));
+    expect(view.map!.alignment).toEqual(fixture.map.alignment);
+    expect(view.map!.alignment![2 * fixture.map.width + 2]).toBe(-1);
+    expect(byPower('corruptRegion').target).toEqual({
+      kind: 'region',
+      id: null,
+      key: '2,2',
+      name: 'the region at 2, 2',
+    });
   });
 
   it("matches the server's races, sects and cities (DOW-34/35)", () => {
@@ -101,10 +145,11 @@ describe('projectWorld against a game played by the server', () => {
       (t) => terrainInfo(t).water,
       (h) => neighbors(h, width, fixture.map.height),
     ).map((i) => [i % width, Math.floor(i / width)]);
-    // Homeland (4,4) is offered; Karak's hex (5,4) is not; (6,4) is next to Karak.
+    // Homeland (4,4) is offered; Karak's hex (5,4) is not; nor is (6,4), the Deep Dwarves' home.
     expect(sites).toContainEqual([4, 4]);
     expect(sites).not.toContainEqual([5, 4]);
-    expect(sites).toContainEqual([6, 4]);
+    expect(sites).not.toContainEqual([6, 4]); // the Deep Dwarves' homeland
+    expect(sites).toContainEqual([5, 5]); // next to Karak
     expect(sites).toContainEqual([3, 5]); // even-row neighbor of the homeland
     expect(sites).not.toContainEqual([5, 6]); // two hexes away
     expect(
@@ -120,7 +165,7 @@ describe('projectWorld against a game played by the server', () => {
   it("keeps each hex's history (DOW-33)", () => {
     const width = fixture.map.width;
     const reshaped = hexChanges(view, 2 * width + 2); // [2,2]: mountains, then forest
-    expect(reshaped.map((a) => a.choice)).toEqual(['mountains', 'forest']);
+    expect(reshaped.map((a) => a.choice)).toEqual(['mountains', 'forest', 'the region at 2, 2']);
     expect(reshaped[0].description).toBe('The Spine of the World rises');
     const snowy = hexChanges(view, 2 * width + 3); // [3,2]: mountains, then snow
     expect(snowy.map((a) => a.choice)).toEqual(['mountains', 'snow']);

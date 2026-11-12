@@ -1,26 +1,46 @@
 // DOW-36: the History Chart. Every action becomes a row; rows can be filtered by age, god or a
 // race/city. Pure functions over the projected game (no React).
 import type { ActionRecord, GameView } from '@/game/project';
+import { alignmentLabel, regionAlignmentName } from '@/game/civilization';
 import { climateInfo, terrainInfo } from '@/map/terrain';
 
 export const POWER_NAMES: Record<string, string> = {
   shapeLand: 'Shape Land',
   shapeClimate: 'Shape Climate',
   createRace: 'Create Race',
+  createSubrace: 'Create Subrace',
   commandRace: 'Command Race',
+  advanceCivilization: 'Advance Civilization',
+  advanceCity: 'Advance City',
+  purifyCivilization: 'Purify Civilization',
+  corruptCivilization: 'Corrupt Civilization',
+  purifyCity: 'Purify City',
+  corruptCity: 'Corrupt City',
+  purifyRegion: 'Purify Region',
+  corruptRegion: 'Corrupt Region',
 };
 
-/** e.g. { power: 'Shape Land', what: 'Hills' }, { power: 'Command Race', what: 'founded Karak' }. */
+/**
+ * e.g. { power: 'Shape Land', what: 'Hills' }, { power: 'Command Race', what: 'founded Karak' },
+ * { power: 'Advance City', what: 'Karak, the greatest at Writing' },
+ * { power: 'Purify City', what: 'Karak, now Noble (+2)' }.
+ */
 export function describeAction(action: ActionRecord): { power: string; what: string } {
   const power = POWER_NAMES[action.power] ?? action.power;
-  const what =
-    action.power === 'shapeLand'
-      ? terrainInfo(action.choice).name
-      : action.power === 'shapeClimate'
-        ? climateInfo(action.choice).name
-        : action.intent === 'foundCity'
-          ? `founded ${action.choice}`
-          : action.choice;
+  let what = action.choice;
+  if (action.power === 'shapeLand') what = terrainInfo(action.choice).name;
+  else if (action.power === 'shapeClimate') what = climateInfo(action.choice).name;
+  else if (action.intent === 'foundCity') what = `founded ${action.choice}`;
+  else if (action.power.startsWith('advance') && action.target) {
+    what = `${action.target.name}, the greatest at ${action.choice}`;
+  } else if (/^(purify|corrupt)/.test(action.power) && action.alignmentAfter !== null) {
+    const after = action.alignmentAfter;
+    const now =
+      action.target?.kind === 'region'
+        ? (regionAlignmentName(after) ?? 'restored to neutral')
+        : alignmentLabel(after);
+    what = `${action.choice}, now ${now}`;
+  }
   return { power, what };
 }
 
@@ -29,14 +49,32 @@ export type EntityRef = { id: string; kind: 'race' | 'city'; name: string };
 /** The races and cities an action created or involved (a city's race counts too). */
 export function actionEntities(view: GameView, action: ActionRecord): EntityRef[] {
   const out: EntityRef[] = [];
+  const add = (ref: EntityRef) => {
+    if (!out.some((e) => e.id === ref.id)) out.push(ref);
+  };
+  const raceRef = (id: string | null) => {
+    const race = view.races.find((r) => r.id === id);
+    if (race) add({ id: race.id, kind: 'race', name: race.name });
+  };
   for (const race of view.races) {
-    if (race.createdSeq === action.seq) out.push({ id: race.id, kind: 'race', name: race.name });
+    if (race.createdSeq === action.seq) {
+      raceRef(race.parentId); // a subrace's ancestors
+      add({ id: race.id, kind: 'race', name: race.name });
+    }
+  }
+  // Advance, Purify, Corrupt: the race or city they were aimed at.
+  if (action.target?.kind === 'race') raceRef(action.target.id);
+  if (action.target?.kind === 'city') {
+    const city = view.cities.find((c) => c.id === action.target!.id);
+    if (city) {
+      raceRef(city.raceId);
+      add({ id: city.id, kind: 'city', name: city.name });
+    }
   }
   for (const city of view.cities) {
     if (city.createdSeq !== action.seq) continue;
-    const race = view.races.find((r) => r.id === city.raceId);
-    if (race) out.push({ id: race.id, kind: 'race', name: race.name });
-    out.push({ id: city.id, kind: 'city', name: city.name });
+    raceRef(city.raceId);
+    add({ id: city.id, kind: 'city', name: city.name });
   }
   return out;
 }
