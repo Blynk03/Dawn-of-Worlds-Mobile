@@ -248,6 +248,8 @@ export type GameView = {
   armies: ArmyView[];
   structures: StructureView[];
   advancements: AdvancementView[];
+  /** DOW-17: gods whose players deleted their accounts; they take no more turns. */
+  departedGods: string[];
   /** DOW-52/53: every vote, oldest first. */
   proposals: ProposalView[];
   /** The round the current age began in. */
@@ -288,6 +290,7 @@ export const EMPTY_GAME: GameView = {
   avatars: [],
   armies: [],
   structures: [],
+  departedGods: [],
   proposals: [],
   ageStartedRound: 1,
   agePending: false,
@@ -647,6 +650,14 @@ export function applyEvent(view: GameView, event: GameEvent): GameView {
         next.map = map;
         next.hexHistory = history;
       }
+      return next;
+    }
+
+    case 'god_departed': {
+      const god = str(p.god_id);
+      if (!god) return next;
+      next.departedGods = [...view.departedGods, god];
+      next.turnOrder = view.turnOrder.filter((id) => id !== god);
       return next;
     }
 

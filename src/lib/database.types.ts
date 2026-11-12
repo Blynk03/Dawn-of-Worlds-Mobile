@@ -123,6 +123,7 @@ export type Database = {
           color: string;
           sigil: string;
           created_at: string;
+          departed_at: string | null;
           updated_at: string;
         };
         Insert: {
@@ -135,6 +136,7 @@ export type Database = {
           color: string;
           sigil: string;
           created_at?: string;
+          departed_at?: string | null;
           updated_at?: string;
         };
         Update: {
@@ -349,6 +351,7 @@ export type Database = {
         Args: { target_world: string; avatar: string; intent: string; args: Json };
         Returns: string | null;
       };
+      delete_my_account: { Args: Record<string, never>; Returns: undefined };
       propose_next_age: { Args: { target_world: string }; Returns: string };
       object_to_action: {
         Args: { target_world: string; action_seq: number; reason: string };

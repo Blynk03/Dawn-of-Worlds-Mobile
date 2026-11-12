@@ -68,6 +68,7 @@ const god = (overrides: Partial<God>): God => ({
   color: '#E3B05B',
   sigil: '☀',
   created_at: '',
+  departed_at: null,
   updated_at: '',
   ...overrides,
 });

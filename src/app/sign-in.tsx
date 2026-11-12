@@ -9,13 +9,16 @@ import { PlaceholderScreen } from '@/components/placeholder-screen';
 import { ThemedText } from '@/components/themed-text';
 import { supabase } from '@/lib/supabase';
 
-type Step = { kind: 'email' } | { kind: 'sent'; email: string };
+// 'password': for accounts made in Supabase with a password, such as the one Google Play's
+// reviewers use (they can't receive our emails). Nobody can sign up with a password.
+type Step = { kind: 'email' } | { kind: 'sent'; email: string } | { kind: 'password' };
 
 export default function SignInScreen() {
   const { linkError, clearLinkError } = useAuth();
   const [step, setStep] = useState<Step>({ kind: 'email' });
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
+  const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -50,6 +53,19 @@ export default function SignInScreen() {
     if (verifyError) setError(verifyError.message);
   };
 
+  const signInWithPassword = async () => {
+    if (!supabase) return;
+    setBusy(true);
+    setError(null);
+    clearLinkError();
+    const { error: signInError } = await supabase.auth.signInWithPassword({
+      email: email.trim(),
+      password,
+    });
+    setBusy(false);
+    if (signInError) setError(signInError.message);
+  };
+
   const shownError = error ?? linkError;
 
   return (
@@ -77,6 +93,57 @@ export default function SignInScreen() {
             onPress={() => sendLink(email.trim())}
             disabled={!looksLikeEmail(email)}
             busy={busy}
+          />
+          <Button
+            title="Sign in with a password"
+            variant="secondary"
+            onPress={() => {
+              setStep({ kind: 'password' });
+              setError(null);
+            }}
+          />
+          {shownError ? <ErrorText message={shownError} /> : null}
+        </PlaceholderScreen>
+      ) : step.kind === 'password' ? (
+        <PlaceholderScreen
+          title="Sign in with a password"
+          description="For accounts that were given a password. Everyone else signs in with an emailed link.">
+          <TextField
+            label="Email"
+            value={email}
+            onChangeText={setEmail}
+            placeholder="you@example.com"
+            autoCapitalize="none"
+            autoComplete="email"
+            keyboardType="email-address"
+            textContentType="emailAddress"
+          />
+          <TextField
+            label="Password"
+            value={password}
+            onChangeText={setPassword}
+            autoCapitalize="none"
+            autoComplete="password"
+            textContentType="password"
+            secureTextEntry
+            returnKeyType="go"
+            onSubmitEditing={() => looksLikeEmail(email) && password && signInWithPassword()}
+          />
+          <Button
+            title="Sign in"
+            onPress={signInWithPassword}
+            disabled={!looksLikeEmail(email) || !password}
+            busy={busy}
+          />
+          <Button
+            title="Use an emailed link instead"
+            variant="secondary"
+            onPress={() => {
+              setStep({ kind: 'email' });
+              setPassword('');
+              setError(null);
+            }}
+            disabled={busy}
           />
           {shownError ? <ErrorText message={shownError} /> : null}
         </PlaceholderScreen>

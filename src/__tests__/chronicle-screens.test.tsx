@@ -65,6 +65,7 @@ const god = (id: string, user_id: string, name: string): God => ({
   color: '#B45309',
   sigil: '⛰',
   created_at: '',
+  departed_at: null,
   updated_at: '',
 });
 const gods = fixture.state.turn_order.map((id, i) =>

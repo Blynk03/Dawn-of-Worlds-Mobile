@@ -39,6 +39,7 @@ const god = (id: string, name: string): God => ({
   color: '#B45309',
   sigil: '⛰',
   created_at: '',
+  departed_at: null,
   updated_at: '',
 });
 const gods = [god(creatorId, 'Solara')];

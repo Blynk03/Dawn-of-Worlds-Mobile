@@ -1,0 +1,68 @@
+name: Release to Google Play
+
+# Run by hand (Actions → "Release to Google Play" → Run workflow), choosing a testing track.
+#
+# Builds the production Android app bundle on Expo's servers (signed with the app's key, version
+# code bumped automatically) and uploads it to Google Play as a draft release on that track.
+# Then open Play Console → Testing → the track → review the draft release and roll it out.
+#
+# Needs:
+#   - the EXPO_TOKEN and GOOGLE_SERVICES_JSON secrets (already set up for the APK builds);
+#   - a Google service account key uploaded to expo.dev (Credentials → Android →
+#     com.blynk03.dawnofworlds → Google Service Account Key for Play Store submissions).
+#     That key is a secret: it lives only on expo.dev, never in this repo or a GitHub secret.
+# See docs/play-store.md.
+
+on:
+  workflow_dispatch:
+    inputs:
+      track:
+        description: Testing track
+        type: choice
+        options:
+          - internal
+          - closed
+        default: internal
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Check the secrets are set
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          if [ -z "$EXPO_TOKEN" ]; then
+            echo "::error::Add the EXPO_TOKEN secret first (expo.dev → Account settings → Access tokens)."
+            exit 1
+          fi
+          if [ -z "$GOOGLE_SERVICES_JSON" ]; then
+            echo "::error::Add the GOOGLE_SERVICES_JSON secret first (docs/notifications.md), or notifications won't work."
+            exit 1
+          fi
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+      - uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+      - name: Add Firebase config
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          printf '%s' "$GOOGLE_SERVICES_JSON" > google-services.json
+          node -e "JSON.parse(require('fs').readFileSync('google-services.json','utf8'))"
+      - name: Build and upload to Google Play (${{ inputs.track }})
+        run: >
+          eas build --platform android --profile production --non-interactive --wait
+          --auto-submit-with-profile ${{ inputs.track == 'closed' && 'closed' || 'production' }}
