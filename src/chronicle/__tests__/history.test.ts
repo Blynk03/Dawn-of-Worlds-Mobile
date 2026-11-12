@@ -59,6 +59,28 @@ describe('History Chart (DOW-36)', () => {
     });
   });
 
+  it('describes the civilization powers (DOW-43/46/47)', () => {
+    expect(describeAction(byPower('createSubrace'))).toEqual({
+      power: 'Create Subrace',
+      what: 'Deep Dwarves',
+    });
+    expect(describeAction(byPower('advanceCivilization'))).toEqual({
+      power: 'Advance Civilization',
+      what: 'Dwarves, the greatest at Steel',
+    });
+    expect(describeAction(byPower('purifyCity'))).toEqual({
+      power: 'Purify City',
+      what: 'Karak, now Noble (+2)',
+    });
+    expect(describeAction(byPower('corruptRegion'))).toEqual({
+      power: 'Corrupt Region',
+      what: 'the region at 2, 2, now Blighted',
+    });
+    expect(describeAction({ ...byPower('corruptRegion'), alignmentAfter: 0 }).what).toBe(
+      'the region at 2, 2, now restored to neutral',
+    );
+  });
+
   it('knows which races and cities an action involves', () => {
     expect(actionEntities(view, byPower('shapeLand'))).toEqual([]);
     expect(actionEntities(view, byPower('createRace'))).toEqual([
@@ -68,6 +90,19 @@ describe('History Chart (DOW-36)', () => {
       { id: dwarves.id, kind: 'race', name: 'Dwarves' },
       { id: karak.id, kind: 'city', name: 'Karak' },
     ]);
+    const deep = view.races[1];
+    expect(actionEntities(view, byPower('createSubrace'))).toEqual([
+      { id: dwarves.id, kind: 'race', name: 'Dwarves' },
+      { id: deep.id, kind: 'race', name: 'Deep Dwarves' },
+    ]);
+    expect(actionEntities(view, byPower('advanceCivilization'))).toEqual([
+      { id: dwarves.id, kind: 'race', name: 'Dwarves' },
+    ]);
+    expect(actionEntities(view, byPower('purifyCity'))).toEqual([
+      { id: dwarves.id, kind: 'race', name: 'Dwarves' },
+      { id: karak.id, kind: 'city', name: 'Karak' },
+    ]);
+    expect(actionEntities(view, byPower('corruptRegion'))).toEqual([]);
   });
 
   it('filters by age, god and race or city', () => {
@@ -77,11 +112,18 @@ describe('History Chart (DOW-36)', () => {
     const godId = dwarves.godId!;
     expect(historyRows(view, { godId }).every((r) => r.godId === godId)).toBe(true);
     expect(historyRows(view, { godId }).length).toBeGreaterThan(0);
+    // A race's history includes its cities and subraces.
     expect(historyRows(view, { entityId: dwarves.id }).map((r) => r.power)).toEqual([
       'createRace',
       'commandRace',
+      'createSubrace',
+      'advanceCivilization',
+      'purifyCity',
     ]);
-    expect(historyRows(view, { entityId: karak.id }).map((r) => r.power)).toEqual(['commandRace']);
+    expect(historyRows(view, { entityId: karak.id }).map((r) => r.power)).toEqual([
+      'commandRace',
+      'purifyCity',
+    ]);
     expect(historyRows(view, { entityId: dwarves.id, godId: 'nobody' })).toEqual([]);
   });
 
@@ -89,6 +131,7 @@ describe('History Chart (DOW-36)', () => {
     expect(filterableEntities(view)).toEqual([
       { id: dwarves.id, kind: 'race', name: 'Dwarves' },
       { id: karak.id, kind: 'city', name: 'Karak' },
+      { id: view.races[1].id, kind: 'race', name: 'Deep Dwarves' },
     ]);
   });
 });

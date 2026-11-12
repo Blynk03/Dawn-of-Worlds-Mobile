@@ -48,8 +48,10 @@ const api = jest.mocked(social);
 const events = fixture.events as GameEvent[];
 const view = projectWorld(events);
 const actions = view.actions;
-const karakAction = actions[actions.length - 1];
-const raceAction = actions[actions.length - 2];
+const karakAction = actions.find((a) => a.power === 'commandRace')!;
+const raceAction = actions.find((a) => a.power === 'createRace')!;
+/** Where an action's card is in the feed (newest first). */
+const feedIndex = (seq: number) => [...actions].reverse().findIndex((a) => a.seq === seq);
 const dwarves = view.races[0];
 const karak = view.cities[0];
 
@@ -136,8 +138,11 @@ describe('Activity feed (DOW-37)', () => {
     await render(<ChronicleScreen />);
     expect(await screen.findByText('Solara · Command Race: founded Karak')).toBeTruthy();
     expect(cards()).toHaveLength(actions.length);
-    expect(cards()[0].props.children.join('')).toContain('founded Karak');
-    expect(cards()[1].props.children.join('')).toContain('Create Race: Dwarves');
+    const text = (i: number) => cards()[i].props.children.join('');
+    expect(text(0)).toContain('Corrupt Region: the region at 2, 2, now Blighted');
+    expect(text(feedIndex(karakAction.seq))).toContain('founded Karak');
+    expect(text(feedIndex(raceAction.seq))).toContain('Create Race: Dwarves');
+    expect(feedIndex(karakAction.seq)).toBeLessThan(feedIndex(raceAction.seq));
     expect(
       screen.getAllByText(
         new RegExp(`First Age · Round ${karakAction.round} · Year ${karakAction.year}`),
@@ -159,7 +164,7 @@ describe('Activity feed (DOW-37)', () => {
       pathname: '/world/[id]/atlas',
       params: { id: 'w1', entity: karak.id },
     });
-    await fireEvent.press(screen.getAllByLabelText('Show on the map')[0]);
+    await fireEvent.press(screen.getAllByLabelText('Show on the map')[feedIndex(karakAction.seq)]);
     expect(mockRouter.dismissTo).toHaveBeenCalledWith({
       pathname: '/world/[id]',
       params: { id: 'w1', hex: '5,4' },
@@ -173,7 +178,7 @@ describe('Activity feed (DOW-37)', () => {
     await fireEvent.press(fire);
     expect(api.toggleReaction).toHaveBeenCalledWith('w1', karakAction.seq, '🔥');
     expect(api.loadSocial).toHaveBeenCalledTimes(2); // refreshed after reacting
-    await fireEvent.press(screen.getAllByLabelText('😂 0')[0]);
+    await fireEvent.press(screen.getAllByLabelText('😂 0')[feedIndex(karakAction.seq)]);
     expect(api.toggleReaction).toHaveBeenCalledWith('w1', karakAction.seq, '😂');
   });
 
@@ -196,9 +201,12 @@ describe('Activity feed (DOW-37)', () => {
   it('comments on an action and deletes your own comments', async () => {
     await render(<ChronicleScreen />);
     await screen.findByText('Solara · Command Race: founded Karak');
-    // The Create Race card has no comments yet.
+    // Every card but Karak's has no comments yet, so has a "Comment" button.
+    const withoutComments = [...actions].reverse().filter((a) => a.seq !== karakAction.seq);
     const commentButtons = screen.getAllByRole('button', { name: 'Comment' });
-    await fireEvent.press(commentButtons[0]);
+    await fireEvent.press(
+      commentButtons[withoutComments.findIndex((a) => a.seq === raceAction.seq)],
+    );
     await fireEvent.changeText(screen.getByLabelText('Add a comment'), 'Welcome, dwarves');
     await fireEvent.press(screen.getByRole('button', { name: 'Post' }));
     expect(api.addComment).toHaveBeenCalledWith('w1', raceAction.seq, 'Welcome, dwarves', null);
@@ -241,9 +249,9 @@ describe('History Chart (DOW-36)', () => {
     await render(<ChronicleScreen />);
     await screen.findByText(`${actions.length} entries`);
     await fireEvent.press(screen.getByLabelText('Dwarves'));
-    expect(screen.getByText('2 entries')).toBeTruthy();
+    expect(screen.getByText('5 entries')).toBeTruthy(); // with Karak, its subrace and advancement
     await fireEvent.press(screen.getByLabelText('Karak (city)'));
-    expect(screen.getByText('1 entry')).toBeTruthy();
+    expect(screen.getByText('2 entries')).toBeTruthy(); // founded, then purified
     await fireEvent.press(screen.getByLabelText('Everything'));
 
     const solaraActions = actions.filter((a) => a.godId === dwarves.godId).length;
@@ -265,7 +273,7 @@ describe('History Chart (DOW-36)', () => {
       pathname: '/world/[id]/atlas',
       params: { id: 'w1', entity: dwarves.id },
     });
-    await fireEvent.press(screen.getByLabelText('Show hex 4, 4 on the map'));
+    await fireEvent.press(screen.getAllByLabelText('Show hex 4, 4 on the map')[0]);
     expect(mockRouter.dismissTo).toHaveBeenCalledWith({
       pathname: '/world/[id]',
       params: { id: 'w1', hex: '4,4' },

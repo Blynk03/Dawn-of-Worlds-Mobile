@@ -12,6 +12,7 @@ describe('mapMarkers', () => {
     const width = fixture.map.width;
     expect(mapMarkers(view, gods)).toEqual([
       { index: 4 * width + 4, kind: 'race', color: '#E3B05B', label: 'Dwarves' },
+      { index: 4 * width + 6, kind: 'race', color: '#E3B05B', label: 'Deep Dwarves' },
       { index: 4 * width + 5, kind: 'city', color: '#E3B05B', label: 'Karak' },
     ]);
   });

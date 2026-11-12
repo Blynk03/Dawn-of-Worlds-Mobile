@@ -95,6 +95,20 @@ select pg_temp.act_sql('11111111-1111-1111-1111-111111111111', $q$
 select pg_temp.act_sql('11111111-1111-1111-1111-111111111111', $q$
   select public.found_city('11111111-1111-1111-1111-111111111111',
     (select id from public.world_entities where name = 'Dwarves'), 'Karak', 5, 4, 'A hall is carved into the hill')$q$);
+-- DOW-43/46/47: a subrace beside Karak, an advancement, and alignment changes.
+select pg_temp.act_sql('11111111-1111-1111-1111-111111111111', $q$
+  select public.create_subrace('11111111-1111-1111-1111-111111111111',
+    (select id from public.world_entities where name = 'Dwarves'), 'Deep Dwarves', 'They delve too deep',
+    'Pale and silent', -1, 6, 4)$q$);
+select pg_temp.act_sql('11111111-1111-1111-1111-111111111111', $q$
+  select public.advance('11111111-1111-1111-1111-111111111111',
+    (select id from public.world_entities where name = 'Dwarves'), 'Steel', 'The forges never cool')$q$);
+select pg_temp.act_sql('11111111-1111-1111-1111-111111111111', $q$
+  select public.change_alignment('11111111-1111-1111-1111-111111111111', 'city',
+    (select id from public.world_entities where name = 'Karak'), null, null, 1, 'Pilgrims come')$q$);
+select pg_temp.act_sql('11111111-1111-1111-1111-111111111111', $q$
+  select public.change_alignment('11111111-1111-1111-1111-111111111111', 'region', null, 2, 2, -1,
+    'A blight in the woods')$q$);
 select pg_temp.play('11111111-1111-1111-1111-111111111111', false, false);
 reset role;
 update public.world_state set turn_deadline = now() - interval '1 minute'
@@ -116,8 +130,13 @@ select jsonb_pretty(jsonb_build_object(
   'powers', (select jsonb_object_agg(god_id, jsonb_build_object('power', power, 'lowPoolBonus', low_pool_bonus))
     from public.god_power where world_id = '11111111-1111-1111-1111-111111111111'),
   'entities', (select jsonb_agg(jsonb_build_object('id', id, 'kind', kind, 'name', name, 'race_id', race_id,
-      'god_id', god_id, 'alignment', alignment, 'hex_x', hex_x, 'hex_y', hex_y) order by created_seq, kind desc)
+      'god_id', god_id, 'alignment', alignment, 'hex_x', hex_x, 'hex_y', hex_y, 'parent_race_id', parent_race_id)
+      order by created_seq, kind desc)
     from public.world_entities where world_id = '11111111-1111-1111-1111-111111111111'),
-  'map', (select jsonb_build_object('width', width, 'height', height, 'terrain', to_jsonb(terrain), 'climate', to_jsonb(climate))
+  'advancements', (select coalesce(jsonb_agg(jsonb_build_object('entity_id', entity_id, 'field', field,
+      'god_id', god_id) order by created_seq), '[]') from public.world_advancements
+    where world_id = '11111111-1111-1111-1111-111111111111'),
+  'map', (select jsonb_build_object('width', width, 'height', height, 'terrain', to_jsonb(terrain), 'climate', to_jsonb(climate),
+    'alignment', to_jsonb(coalesce(alignment, '{}'::int[])))
     from public.world_map where world_id = '11111111-1111-1111-1111-111111111111')
 ));

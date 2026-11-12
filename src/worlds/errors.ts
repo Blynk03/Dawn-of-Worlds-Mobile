@@ -3,6 +3,7 @@ const KNOWN: [RegExp, string][] = [
   [/gods_world_id_color_key/, 'Another god already uses that color.'],
   [/gods_world_name_idx/, 'Another god in this world already has that name.'],
   [/world_entities_name_idx/, 'Something in this world already has that name.'],
+  [/world_advancements_field_idx/, 'Someone is already the greatest in the world at that.'],
   [/gods_world_id_user_id_key/, 'You already have a god in this world.'],
   [/row-level security|permission denied/i, "You don't have permission to do that."],
   [

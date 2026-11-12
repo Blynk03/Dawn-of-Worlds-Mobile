@@ -316,6 +316,35 @@ export type Database = {
         };
         Returns: string;
       };
+      create_subrace: {
+        Args: {
+          target_world: string;
+          parent_race: string;
+          race_name: string;
+          race_description: string;
+          race_appearance: string;
+          race_alignment: number;
+          hex_x: number;
+          hex_y: number;
+        };
+        Returns: string;
+      };
+      advance: {
+        Args: { target_world: string; target: string; field: string; description: string };
+        Returns: string;
+      };
+      change_alignment: {
+        Args: {
+          target_world: string;
+          target_kind: string;
+          target: string | null;
+          hex_x: number | null;
+          hex_y: number | null;
+          direction: number;
+          description: string;
+        };
+        Returns: number;
+      };
       found_city: {
         Args: {
           target_world: string;

@@ -68,7 +68,7 @@ describe('A world in play', () => {
     await render(<ActiveWorld worldId="w1" gods={gods} members={members} myId="u-0" />);
     expect(await screen.findByText('marker race Dwarves at 44')).toBeTruthy();
     expect(screen.getByText('marker city Karak at 45')).toBeTruthy();
-    await fireEvent.press(screen.getByRole('button', { name: 'Atlas · 1 race, 1 city' }));
+    await fireEvent.press(screen.getByRole('button', { name: 'Atlas · 2 races, 1 city' }));
     expect(mockPush).toHaveBeenCalledWith('/world/w1/atlas');
   });
 

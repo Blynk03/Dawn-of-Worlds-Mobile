@@ -33,9 +33,21 @@ const PDF_TABLE_OF_POWERS: Record<string, [number, number, number]> = {
 };
 
 describe('Classic ruleset', () => {
-  it('has exactly the powers in the PDF Table of Powers', () => {
-    expect(CLASSIC_RULESET.powers.map((p) => p.name).sort()).toEqual(
-      Object.keys(PDF_TABLE_OF_POWERS).sort(),
+  const original = CLASSIC_RULESET.powers.filter((p) => !p.houseRule);
+
+  it('has exactly the powers in the PDF Table of Powers, apart from marked house rules', () => {
+    expect(original.map((p) => p.name).sort()).toEqual(Object.keys(PDF_TABLE_OF_POWERS).sort());
+  });
+
+  it('only adds powers the rules describe but leave unpriced, priced like their nearest kin', () => {
+    const house = CLASSIC_RULESET.powers.filter((p) => p.houseRule);
+    expect(house.map((p) => p.id).sort()).toEqual(['corruptRegion', 'purifyRegion']);
+    // "changing general alignment of a civilization, city, or a one inch region": priced like a city.
+    expect(house.find((p) => p.id === 'purifyRegion')?.costs).toEqual(
+      PDF_TABLE_OF_POWERS['Purify City (+1 alignment)'],
+    );
+    expect(house.find((p) => p.id === 'corruptRegion')?.costs).toEqual(
+      PDF_TABLE_OF_POWERS['Corrupt City (-1 alignment)'],
     );
   });
 
@@ -52,9 +64,7 @@ describe('Classic ruleset', () => {
   it('flags the footnoted powers', () => {
     const presence = CLASSIC_RULESET.powers.filter((p) => p.requiresPresence).map((p) => p.id);
     expect(presence.sort()).toEqual(['commandCity', 'commandRace']); // footnote **
-    const oncePerTarget = CLASSIC_RULESET.powers
-      .filter((p) => p.oncePerTargetPerTurn)
-      .map((p) => p.id);
+    const oncePerTarget = original.filter((p) => p.oncePerTargetPerTurn).map((p) => p.id);
     expect(oncePerTarget.sort()).toEqual([
       'corruptCity',
       'corruptCivilization',

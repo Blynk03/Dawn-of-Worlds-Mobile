@@ -8,6 +8,8 @@ import { type GameEvent, projectWorld } from '@/game/project';
 import type { God, World, WorldMapRow } from '@/lib/database.types';
 import * as worldsApi from '@/worlds/api';
 
+import { withoutRaces } from '../../test/fixture-helpers';
+
 const mockRouter = { push: jest.fn(), replace: jest.fn(), back: jest.fn() };
 let mockAuthUser = 'u-active';
 
@@ -137,18 +139,17 @@ describe('Choosing a power (DOW-26)', () => {
     expect(screen.getByRole('button', { name: 'Shape Land' })).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Create Race' })).toBeDisabled();
     expect(screen.getByText('Needs 22 power')).toBeTruthy();
-    expect(screen.getByText('Needs 8 power')).toBeTruthy(); // Found a city
+    expect(screen.getAllByText('Needs 8 power')).toHaveLength(2); // Found a city, Advance
   });
 
   it('can’t found a city before there are races', async () => {
-    const noRaces = (fixture.events as GameEvent[]).filter(
-      (e) => !['createRace', 'commandRace'].includes((e.payload as { power?: string }).power ?? ''),
-    );
+    const noRaces = withoutRaces(fixture.events as GameEvent[]);
     game.loadGameEvents.mockResolvedValue(eventsWithPower(100, noRaces));
     await render(<ActScreen />);
     await screen.findByText('Solara has 100 power.');
     expect(screen.getByRole('button', { name: 'Found a city' })).toBeDisabled();
-    expect(screen.getByText('No races yet: create one first')).toBeTruthy();
+    // Found a city, Create Subrace and Advance all need a race.
+    expect(screen.getAllByText('No races yet: create one first')).toHaveLength(3);
   });
 
   it('can go back and choose another power', async () => {
@@ -308,12 +309,13 @@ describe('Found a city (DOW-35)', () => {
     // On or next to the homeland (4,4) and Karak (5,4); never on Karak itself.
     const candidates = screen.getByText(/^candidates /).props.children as string;
     const list = candidates.replace('candidates ', '').split(',').map(Number);
-    expect(list).toEqual(expect.arrayContaining([44, 46, 35]));
+    expect(list).toEqual(expect.arrayContaining([44, 35, 55]));
     expect(list).not.toContain(45);
+    expect(list).not.toContain(46); // the Deep Dwarves live there
 
-    await fireEvent.press(screen.getByLabelText('hex 6,4'));
+    await fireEvent.press(screen.getByLabelText('hex 5,5'));
     await fireEvent.changeText(screen.getByLabelText('City name'), 'Irondeep');
-    expect(screen.getByText('Irondeep on hex 6, 4')).toBeTruthy();
+    expect(screen.getByText('Irondeep on hex 5, 5')).toBeTruthy();
     expect(screen.getByText("Costs 8. You'll have 22 power left.")).toBeTruthy();
     await fireEvent.changeText(screen.getByLabelText('What happens?'), 'Miners follow a vein east');
     await fireEvent.press(screen.getByRole('button', { name: 'Found the city' }));
@@ -321,7 +323,7 @@ describe('Found a city (DOW-35)', () => {
       'w1',
       dwarves.id,
       'Irondeep',
-      { x: 6, y: 4 },
+      { x: 5, y: 5 },
       'Miners follow a vein east',
     );
   });
@@ -390,5 +392,171 @@ describe('Starting landmass (DOW-30)', () => {
     mockAuthUser = 'u-2';
     await render(<LandmassScreen />);
     expect(await screen.findByText(/Only the host can shape the starting landmass/)).toBeTruthy();
+  });
+});
+
+describe('Create Subrace (DOW-43)', () => {
+  const [dwarves] = view.races;
+
+  beforeEach(() => {
+    game.loadGameEvents.mockResolvedValue(eventsWithPower(30));
+    game.createSubrace.mockResolvedValue('new-subrace');
+  });
+
+  it("starts next to the parent race's land, with its own name and nature", async () => {
+    await render(<ActScreen />);
+    await openPower('Create Subrace');
+    expect(screen.getByText(/12 power in the First Age/)).toBeTruthy();
+    expect(screen.getByLabelText('Dwarves').props.accessibilityState).toMatchObject({
+      checked: true,
+    });
+    await fireEvent.press(screen.getByLabelText('hex 8,6'));
+    expect(
+      screen.getByText('Choose a highlighted hex, next to the parent race’s land.'),
+    ).toBeTruthy();
+
+    await fireEvent.press(screen.getByLabelText('hex 3,4'));
+    await fireEvent.changeText(screen.getByLabelText('Race name'), 'Hill Dwarves');
+    await fireEvent.changeText(
+      screen.getByLabelText('What are they like?'),
+      'Shepherds of the slopes',
+    );
+    await fireEvent.press(screen.getByLabelText('Good'));
+    expect(screen.getByText("Costs 12. You'll have 18 power left.")).toBeTruthy();
+    await fireEvent.press(screen.getByRole('button', { name: 'Create the subrace' }));
+    expect(game.createSubrace).toHaveBeenCalledWith('w1', dwarves.id, {
+      name: 'Hill Dwarves',
+      description: 'Shepherds of the slopes',
+      appearance: '',
+      alignment: 1,
+      hex: { x: 3, y: 4 },
+    });
+  });
+});
+
+describe('Advance (DOW-47)', () => {
+  const [dwarves] = view.races;
+  const karak = view.cities[0];
+
+  beforeEach(() => {
+    game.loadGameEvents.mockResolvedValue(eventsWithPower(30));
+    game.advance.mockResolvedValue();
+  });
+
+  it('makes a civilization the greatest in the world at something', async () => {
+    await render(<ActScreen />);
+    await openPower('Advance');
+    await fireEvent.press(screen.getByLabelText('Dwarves'));
+    // Steel is taken (by the Dwarves themselves).
+    expect(screen.getByLabelText('Steel · Dwarves').props.accessibilityState).toMatchObject({
+      disabled: true,
+    });
+    await fireEvent.press(screen.getByLabelText('Writing'));
+    expect(screen.getByText('Dwarves becomes the greatest in the world at Writing.')).toBeTruthy();
+    expect(screen.getByText("Costs 10. You'll have 20 power left.")).toBeTruthy();
+    await fireEvent.changeText(screen.getByLabelText('What happens?'), 'Runes on every stone');
+    await fireEvent.press(screen.getByRole('button', { name: 'Advance Dwarves' }));
+    expect(game.advance).toHaveBeenCalledWith('w1', dwarves.id, 'Writing', 'Runes on every stone');
+  });
+
+  it('advances a city for its own price, picked on the map', async () => {
+    await render(<ActScreen />);
+    await openPower('Advance');
+    await fireEvent.press(screen.getByLabelText('City'));
+    await fireEvent.press(screen.getByLabelText('hex 5,4'));
+    await fireEvent.press(screen.getByLabelText('Something else'));
+    await fireEvent.changeText(screen.getByLabelText('Field of knowledge'), 'Brewing');
+    expect(screen.getByText("Costs 8. You'll have 22 power left.")).toBeTruthy();
+    await fireEvent.changeText(screen.getByLabelText('What happens?'), 'The finest ale');
+    await fireEvent.press(screen.getByRole('button', { name: 'Advance Karak' }));
+    expect(game.advance).toHaveBeenCalledWith('w1', karak.id, 'Brewing', 'The finest ale');
+  });
+
+  it("won't let two be the greatest at the same thing", async () => {
+    await render(<ActScreen />);
+    await openPower('Advance');
+    await fireEvent.press(screen.getByLabelText('Dwarves'));
+    await fireEvent.press(screen.getByLabelText('Something else'));
+    await fireEvent.changeText(screen.getByLabelText('Field of knowledge'), ' steel ');
+    expect(screen.getByText('Dwarves is already the greatest in the world at that.')).toBeTruthy();
+    await fireEvent.changeText(screen.getByLabelText('What happens?'), 'Rivals');
+    expect(screen.getByRole('button', { name: 'Advance Dwarves' })).toBeDisabled();
+  });
+});
+
+describe('Purify and Corrupt (DOW-46, DOW-40)', () => {
+  const [dwarves] = view.races;
+  const karak = view.cities[0];
+
+  beforeEach(() => {
+    game.loadGameEvents.mockResolvedValue(eventsWithPower(30));
+    game.changeAlignment.mockResolvedValue(3);
+  });
+
+  it('purifies a city one step up the scale', async () => {
+    await render(<ActScreen />);
+    await openPower('Purify');
+    await fireEvent.press(screen.getByLabelText('City'));
+    await fireEvent.press(screen.getByLabelText(/^Karak · Noble \(\+2\)/));
+    expect(screen.getByText('Karak: Noble (+2) → Virtuous (+3)')).toBeTruthy();
+    expect(screen.getByText("Costs 4. You'll have 26 power left.")).toBeTruthy();
+    await fireEvent.changeText(screen.getByLabelText('What happens?'), 'A temple rises');
+    await fireEvent.press(screen.getByRole('button', { name: 'Purify Karak' }));
+    expect(game.changeAlignment).toHaveBeenCalledWith(
+      'w1',
+      { kind: 'city', id: karak.id },
+      1,
+      'A temple rises',
+    );
+  });
+
+  it('corrupts a region tapped on the map', async () => {
+    await render(<ActScreen />);
+    await openPower('Corrupt');
+    await fireEvent.press(screen.getByLabelText('Region'));
+    await fireEvent.press(screen.getByLabelText('hex 2,2'));
+    expect(screen.getByText('the region at hex 2, 2: Blighted → Cursed (-2)')).toBeTruthy();
+    expect(screen.getByText("Costs 3. You'll have 27 power left.")).toBeTruthy(); // priced like a city
+    await fireEvent.changeText(screen.getByLabelText('What happens?'), 'The rot spreads');
+    await fireEvent.press(screen.getByRole('button', { name: 'Corrupt the region at hex 2, 2' }));
+    expect(game.changeAlignment).toHaveBeenCalledWith(
+      'w1',
+      { kind: 'region', hex: { x: 2, y: 2 } },
+      -1,
+      'The rot spreads',
+    );
+  });
+
+  it('only once per target per turn', async () => {
+    // Earlier this turn, the active god purified the Dwarves.
+    const events = eventsWithPower(30);
+    const last = events[events.length - 1];
+    events.push({
+      ...last,
+      seq: last.seq + 1,
+      payload: {
+        power: 'purifyCivilization',
+        cost: 5,
+        hexes: [[4, 4]],
+        choice: 'Dwarves',
+        description: 'Blessed',
+        power_after: 30,
+        target: { kind: 'race', id: dwarves.id, key: dwarves.id, name: 'Dwarves' },
+        alignment: { delta: 1, after: 2 },
+      },
+    });
+    game.loadGameEvents.mockResolvedValue(events);
+    await render(<ActScreen />);
+    await openPower('Corrupt');
+    const chip = screen.getByLabelText('Dwarves · Noble (+2) · done this turn');
+    expect(chip.props.accessibilityState).toMatchObject({ disabled: true });
+    await fireEvent.press(screen.getByLabelText('hex 4,4'));
+    expect(screen.getByText('You’ve already changed Dwarves’s alignment this turn.')).toBeTruthy();
+    // Other targets are still fine.
+    expect(
+      screen.getByLabelText('Deep Dwarves · Evil (-1)').props.accessibilityState,
+    ).toMatchObject({
+      disabled: false,
+    });
   });
 });

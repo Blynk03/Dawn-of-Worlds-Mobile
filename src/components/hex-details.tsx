@@ -5,6 +5,7 @@ import { Card, GodBadge } from '@/components/game-ui';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { describeAction } from '@/chronicle/history';
+import { alignmentLabel, regionAlignmentName } from '@/game/civilization';
 import {
   type ActionRecord,
   ageName,
@@ -22,8 +23,6 @@ function describeChange(change: ActionRecord): string {
   const { power, what } = describeAction(change);
   return `${power}: ${what}`;
 }
-
-const ALIGNMENT = (n: number) => (n > 0 ? 'good' : n < 0 ? 'evil' : 'neutral');
 
 /** DOW-33: what a hex is now, and every change gods have made to it. */
 export function HexDetails({
@@ -46,6 +45,8 @@ export function HexDetails({
   const changes = view ? hexChanges(view, index) : [];
   const { race, city } = view ? settlementsAt(view, hex) : { race: null, city: null };
   const cityRace = city && view ? view.races.find((r) => r.id === city.raceId) : null;
+  const regionAlignment = map.alignment?.[index] ?? 0;
+  const regionName = regionAlignmentName(regionAlignment);
 
   return (
     <Card style={styles.card}>
@@ -61,16 +62,23 @@ export function HexDetails({
         </View>
         <Button title="Close" variant="secondary" onPress={onClose} />
       </View>
+      {regionName ? (
+        <ThemedText type="small">
+          <ThemedText type="smallBold">{regionName} land</ThemedText>
+          {` · alignment ${regionAlignment > 0 ? `+${regionAlignment}` : regionAlignment}`}
+        </ThemedText>
+      ) : null}
       {race ? (
         <ThemedText type="small">
           <ThemedText type="smallBold">Homeland of the {race.name}</ThemedText>
-          {` · ${ALIGNMENT(race.alignment)}`}
+          {` · ${alignmentLabel(race.alignment)}`}
         </ThemedText>
       ) : null}
       {city ? (
         <ThemedText type="small">
           <ThemedText type="smallBold">City of {city.name}</ThemedText>
           {cityRace ? ` · built by the ${cityRace.name}` : ''}
+          {` · ${alignmentLabel(city.alignment)}`}
         </ThemedText>
       ) : null}
       {changes.length === 0 ? (

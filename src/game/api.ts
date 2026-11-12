@@ -110,6 +110,65 @@ export async function foundCity(
   return data;
 }
 
+/** DOW-43: Create Subrace, next to its parent race's land. Returns the new race's id. */
+export async function createSubrace(
+  worldId: string,
+  parentRaceId: string,
+  race: NewRace,
+): Promise<string> {
+  const { data, error } = await client().rpc('create_subrace', {
+    target_world: worldId,
+    parent_race: parentRaceId,
+    race_name: race.name,
+    race_description: race.description,
+    race_appearance: race.appearance,
+    race_alignment: race.alignment,
+    hex_x: race.hex.x,
+    hex_y: race.hex.y,
+  });
+  if (error) throw new Error(friendlyError(error));
+  return data;
+}
+
+/** DOW-47: Advance Civilization or Advance City (by the target's kind). */
+export async function advance(
+  worldId: string,
+  targetId: string,
+  field: string,
+  description: string,
+): Promise<void> {
+  const { error } = await client().rpc('advance', {
+    target_world: worldId,
+    target: targetId,
+    field,
+    description,
+  });
+  if (error) throw new Error(friendlyError(error));
+}
+
+export type AlignmentTarget =
+  { kind: 'race' | 'city'; id: string } | { kind: 'region'; hex: { x: number; y: number } };
+
+/** DOW-46: Purify (+1) or Corrupt (-1). Returns the target's new alignment. */
+export async function changeAlignment(
+  worldId: string,
+  target: AlignmentTarget,
+  direction: 1 | -1,
+  description: string,
+): Promise<number> {
+  const { data, error } = await client().rpc('change_alignment', {
+    target_world: worldId,
+    target_kind: target.kind,
+    target: target.kind === 'region' ? null : target.id,
+    hex_x: target.kind === 'region' ? target.hex.x : null,
+    hex_y: target.kind === 'region' ? target.hex.y : null,
+    direction,
+    description,
+  });
+  if (error) throw new Error(friendlyError(error));
+  return data;
+}
+
 let channelCounter = 0;
 
 /**

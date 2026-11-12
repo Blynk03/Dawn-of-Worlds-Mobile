@@ -40,6 +40,8 @@ export type WorldMapView = {
   /** Row by row: index = y * width + x. */
   terrain: string[];
   climate: string[];
+  /** DOW-46: each hex's alignment, changed by Purify / Corrupt Region (0 or missing = untouched). */
+  alignment?: number[];
 };
 
 /** One thing a god did to a hex (DOW-33). */
@@ -59,10 +61,21 @@ export type ActionRecord = HexChange & {
   hexes: [number, number][];
   /** What a command was for, e.g. 'foundCity' for Command Race. */
   intent: string | null;
+  /** What an action was aimed at (Advance, Purify, Corrupt). `key` is the id, or "x,y" for a region. */
+  target: ActionTarget | null;
+  /** For Purify / Corrupt: the target's alignment afterwards. */
+  alignmentAfter: number | null;
   /** The world's year when it happened. */
   year: number;
   /** When it was logged (ISO time). */
   at: string;
+};
+
+export type ActionTarget = {
+  kind: 'race' | 'city' | 'region';
+  id: string | null;
+  key: string;
+  name: string;
 };
 
 /** When and by whom something entered the world. */
@@ -74,9 +87,11 @@ export type RaceView = Origin & {
   name: string;
   description: string;
   appearance: string;
-  /** +1 good, 0 neutral, -1 evil (purify/corrupt move it later). */
+  /** Starts at +1 good, 0 neutral or -1 evil; Purify / Corrupt move it, without limit. */
   alignment: number;
   hex: { x: number; y: number };
+  /** DOW-43: the race a subrace split from. */
+  parentId: string | null;
 };
 
 /** DOW-35: a city founded by a race. */
@@ -89,6 +104,9 @@ export type CityView = Origin & {
   /** What happened when it was founded. */
   description: string;
 };
+
+/** DOW-47: a race or city that is the greatest in the world at a field. */
+export type AdvancementView = Origin & { id: string; entityId: string; field: string };
 
 /** A sect (order) within a race; a race's creator gets one automatically. */
 export type OrderView = Origin & { id: string; name: string; raceId: string };
@@ -118,6 +136,7 @@ export type GameView = {
   races: RaceView[];
   cities: CityView[];
   orders: OrderView[];
+  advancements: AdvancementView[];
   /** seq of the current round's round_started event. */
   roundStartSeq: number;
   /** Highest seq applied, so new events can be applied incrementally. */
@@ -142,6 +161,7 @@ export const EMPTY_GAME: GameView = {
   races: [],
   cities: [],
   orders: [],
+  advancements: [],
   roundStartSeq: 0,
   lastSeq: 0,
 };
@@ -246,7 +266,13 @@ export function applyEvent(view: GameView, event: GameEvent): GameView {
       const width = num(p.width);
       const height = num(p.height);
       const strings = (v: unknown) => (Array.isArray(v) ? v.map((x) => String(x)) : []);
-      next.map = { width, height, terrain: strings(p.terrain), climate: strings(p.climate) };
+      next.map = {
+        width,
+        height,
+        terrain: strings(p.terrain),
+        climate: strings(p.climate),
+        alignment: Array.from({ length: width * height }, () => 0),
+      };
       next.hexHistory = {};
       return next;
     }
@@ -266,6 +292,9 @@ export function applyEvent(view: GameView, event: GameEvent): GameView {
         cost: num(p.cost),
         hexes,
         intent: str(p.intent),
+        target: targetOf(p.target),
+        alignmentAfter:
+          typeof asObj(p.alignment).after === 'number' ? num(asObj(p.alignment).after) : null,
         year: view.year,
         at: event.created_at,
       };
@@ -276,7 +305,7 @@ export function applyEvent(view: GameView, event: GameEvent): GameView {
         age: event.age,
         round: event.round,
       };
-      if (action.power === 'createRace') {
+      if (action.power === 'createRace' || action.power === 'createSubrace') {
         const race = asObj(p.race);
         const order = asObj(p.order);
         const id = str(race.id);
@@ -291,6 +320,7 @@ export function applyEvent(view: GameView, event: GameEvent): GameView {
               appearance: str(race.appearance) ?? '',
               alignment: num(race.alignment),
               hex: hexOf(race.hex),
+              parentId: str(race.parent_id),
             },
           ];
           const orderId = str(order.id);
@@ -321,6 +351,32 @@ export function applyEvent(view: GameView, event: GameEvent): GameView {
           ];
         }
       }
+      if (action.power === 'advanceCivilization' || action.power === 'advanceCity') {
+        const advancement = asObj(p.advancement);
+        const id = str(advancement.id);
+        if (id && action.target?.id) {
+          next.advancements = [
+            ...view.advancements,
+            {
+              ...origin,
+              id,
+              entityId: action.target.id,
+              field: str(advancement.field) ?? action.choice,
+            },
+          ];
+        }
+      }
+      // DOW-46: Purify / Corrupt. The server sends the new value.
+      const alignment = asObj(p.alignment);
+      if (action.target && typeof alignment.after === 'number') {
+        const after = alignment.after;
+        const { kind, id } = action.target;
+        if (kind === 'race' && id) {
+          next.races = next.races.map((r) => (r.id === id ? { ...r, alignment: after } : r));
+        } else if (kind === 'city' && id) {
+          next.cities = next.cities.map((c) => (c.id === id ? { ...c, alignment: after } : c));
+        }
+      }
       if (event.god_id) {
         next.powers = {
           ...view.powers,
@@ -337,12 +393,20 @@ export function applyEvent(view: GameView, event: GameEvent): GameView {
             : action.power === 'shapeClimate'
               ? 'climate'
               : null;
-        const map = { ...view.map, terrain: [...view.map.terrain], climate: [...view.map.climate] };
+        const map = {
+          ...view.map,
+          terrain: [...view.map.terrain],
+          climate: [...view.map.climate],
+          alignment: [...(view.map.alignment ?? [])],
+        };
         const history = { ...view.hexHistory };
         for (const [x, y] of hexes) {
           if (x < 0 || y < 0 || x >= map.width || y >= map.height) continue;
           const index = y * map.width + x;
           if (layer) map[layer][index] = action.choice;
+          if (action.target?.kind === 'region' && typeof alignment.after === 'number') {
+            map.alignment[index] = alignment.after;
+          }
           history[index] = [...(history[index] ?? []), event.seq];
         }
         next.map = map;
@@ -359,6 +423,14 @@ export function applyEvent(view: GameView, event: GameEvent): GameView {
 
 export function projectWorld(events: readonly GameEvent[], from: GameView = EMPTY_GAME): GameView {
   return [...events].sort((a, b) => a.seq - b.seq).reduce(applyEvent, from);
+}
+
+function targetOf(v: unknown): ActionTarget | null {
+  const t = asObj(v);
+  const kind = str(t.kind);
+  const key = str(t.key) ?? str(t.id);
+  if ((kind !== 'race' && kind !== 'city' && kind !== 'region') || !key) return null;
+  return { kind, id: str(t.id), key, name: str(t.name) ?? '' };
 }
 
 function hexOf(v: unknown): { x: number; y: number } {

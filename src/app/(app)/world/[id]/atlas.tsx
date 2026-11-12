@@ -13,14 +13,17 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import { useGame } from '@/game/hooks';
-import { ageName, type CityView, type OrderView, type RaceView } from '@/game/project';
+import { alignmentLabel } from '@/game/civilization';
+import {
+  type AdvancementView,
+  ageName,
+  type CityView,
+  type OrderView,
+  type RaceView,
+} from '@/game/project';
 import type { God } from '@/lib/database.types';
 import { useTheme } from '@/hooks/use-theme';
 import { useLobby } from '@/worlds/hooks';
-
-const ALIGNMENTS: Record<string, string> = { '1': 'Good', '0': 'Neutral', '-1': 'Evil' };
-const alignmentName = (n: number) =>
-  ALIGNMENTS[String(n)] ?? (n > 0 ? `Good (+${n})` : `Evil (${n})`);
 
 /** DOW-34/35: every race in the world, with its sects and cities. */
 export default function AtlasScreen() {
@@ -59,6 +62,9 @@ export default function AtlasScreen() {
               race={race}
               orders={view.orders.filter((o) => o.raceId === race.id)}
               cities={view.cities.filter((c) => c.raceId === race.id)}
+              parentName={view.races.find((r) => r.id === race.parentId)?.name ?? null}
+              subraces={view.races.filter((r) => r.parentId === race.id).map((r) => r.name)}
+              advancements={view.advancements}
               gods={lobby.gods}
               highlight={race.id === targetRace ? entity : undefined}
               onLayoutY={
@@ -78,6 +84,9 @@ function RaceCard({
   race,
   orders,
   cities,
+  parentName,
+  subraces,
+  advancements,
   gods,
   highlight,
   onLayoutY,
@@ -85,6 +94,10 @@ function RaceCard({
   race: RaceView;
   orders: OrderView[];
   cities: CityView[];
+  /** DOW-43: the race this one split from, if it's a subrace. */
+  parentName: string | null;
+  subraces: string[];
+  advancements: AdvancementView[];
   gods: God[];
   /** The id of this race, or one of its cities, to highlight. */
   highlight?: string;
@@ -108,12 +121,18 @@ function RaceCard({
         <View style={styles.fill}>
           <ThemedText type="subtitle">{race.name}</ThemedText>
           <ThemedText type="small" themeColor="textSecondary">
-            {alignmentName(race.alignment)} · created by {creator?.name ?? 'a god'} in the{' '}
+            {alignmentLabel(race.alignment)} · created by {creator?.name ?? 'a god'} in the{' '}
             {ageName(race.age)}, round {race.round}
           </ThemedText>
         </View>
       </View>
+      {parentName ? (
+        <ThemedText type="small" themeColor="textSecondary">
+          A subrace of the {parentName}
+        </ThemedText>
+      ) : null}
       <ThemedText>{race.description}</ThemedText>
+      <Greatest fields={greatestFields(advancements, race.id)} />
       {race.appearance ? (
         <ThemedText type="small" themeColor="textSecondary">
           Appearance: {race.appearance}
@@ -122,6 +141,11 @@ function RaceCard({
       <ThemedText type="small" themeColor="textSecondary">
         Homeland: hex {race.hex.x}, {race.hex.y}
       </ThemedText>
+      {subraces.length > 0 ? (
+        <ThemedText type="small" themeColor="textSecondary">
+          Subraces: {subraces.join(', ')}
+        </ThemedText>
+      ) : null}
       {orders.length > 0 ? (
         <ThemedText type="small" themeColor="textSecondary">
           Sects: {orders.map((o) => o.name).join(', ')}
@@ -142,15 +166,29 @@ function RaceCard({
             accessibilityLabel={`City of ${city.name}`}>
             <ThemedText type="smallBold">{city.name}</ThemedText>
             <ThemedText type="small" themeColor="textSecondary">
-              Hex {city.hex.x}, {city.hex.y} · {alignmentName(city.alignment)} · founded at{' '}
+              Hex {city.hex.x}, {city.hex.y} · {alignmentLabel(city.alignment)} · founded at{' '}
               {founder?.name ?? 'a god'}&apos;s command in the {ageName(city.age)}, round{' '}
               {city.round}
             </ThemedText>
             <ThemedText type="small">“{city.description}”</ThemedText>
+            <Greatest fields={greatestFields(advancements, city.id)} />
           </View>
         );
       })}
     </Card>
+  );
+}
+
+const greatestFields = (advancements: AdvancementView[], id: string) =>
+  advancements.filter((a) => a.entityId === id).map((a) => a.field);
+
+/** DOW-47: "Greatest in the world at Steel, Writing". */
+function Greatest({ fields }: { fields: string[] }) {
+  if (fields.length === 0) return null;
+  return (
+    <ThemedText type="small" themeColor="accent">
+      Greatest in the world at {fields.join(', ')}
+    </ThemedText>
   );
 }
 
