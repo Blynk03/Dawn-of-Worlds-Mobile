@@ -60,6 +60,7 @@ const god = (id: string, user_id: string, name: string): God => ({
   color: '#E3B05B',
   sigil: '☀',
   created_at: '',
+  departed_at: null,
   updated_at: '',
 });
 const member = (user_id: string, role: 'host' | 'player') => ({

@@ -16,6 +16,7 @@ jest.mock('@/lib/supabase', () => ({
     auth: {
       signInWithOtp: jest.fn(() => Promise.resolve({ error: null })),
       verifyOtp: jest.fn(() => Promise.resolve({ error: null })),
+      signInWithPassword: jest.fn(() => Promise.resolve({ error: null })),
     },
   },
 }));
@@ -85,5 +86,33 @@ describe('SignInScreen', () => {
     await requestLink();
     await fireEvent.press(screen.getByRole('button', { name: 'Use a different email' }));
     expect(screen.getByLabelText('Email')).toBeTruthy();
+  });
+
+  it('signs in with a password, for accounts given one (Google Play reviewers)', async () => {
+    await render(<SignInScreen />);
+    await fireEvent.press(screen.getByRole('button', { name: 'Sign in with a password' }));
+    expect(screen.getByRole('button', { name: 'Sign in' })).toBeDisabled();
+    await fireEvent.changeText(screen.getByLabelText('Email'), ' review@example.com ');
+    await fireEvent.changeText(screen.getByLabelText('Password'), 'hunter2');
+    await fireEvent.press(screen.getByRole('button', { name: 'Sign in' }));
+    expect(auth.signInWithPassword).toHaveBeenCalledWith({
+      email: 'review@example.com',
+      password: 'hunter2',
+    });
+    expect(auth.signInWithOtp).not.toHaveBeenCalled();
+  });
+
+  it('shows a wrong password, and goes back to emailed links', async () => {
+    auth.signInWithPassword.mockResolvedValueOnce({
+      error: { message: 'Invalid login credentials' },
+    } as never);
+    await render(<SignInScreen />);
+    await fireEvent.press(screen.getByRole('button', { name: 'Sign in with a password' }));
+    await fireEvent.changeText(screen.getByLabelText('Email'), 'review@example.com');
+    await fireEvent.changeText(screen.getByLabelText('Password'), 'nope');
+    await fireEvent.press(screen.getByRole('button', { name: 'Sign in' }));
+    expect(await screen.findByText('Invalid login credentials')).toBeTruthy();
+    await fireEvent.press(screen.getByRole('button', { name: 'Use an emailed link instead' }));
+    expect(screen.getByRole('button', { name: 'Send sign-in link' })).toBeTruthy();
   });
 });

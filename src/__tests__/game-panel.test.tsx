@@ -40,6 +40,7 @@ const god = (id: string, user_id: string, name: string, color: string, sigil: st
   color,
   sigil,
   created_at: '',
+  departed_at: null,
   updated_at: '',
 });
 const gods = [
