@@ -139,14 +139,17 @@ export function CommandCityForm({
       />
       <Button
         title={action === 'build' ? 'Build it' : 'Raise the army'}
-        onPress={() =>
+        onPress={() => {
+          // No `city!.id` here: the React Compiler reads `city.id` while rendering to memoize this
+          // handler, which crashed the form before a city was chosen.
+          if (!city) return;
           onSubmit(
-            city!.id,
+            city.id,
             action === 'build'
               ? { action, name, structure_type: structureType, description }
               : { action, name, description },
-          )
-        }
+          );
+        }}
         busy={busy}
         disabled={!city || !!blockedReason || !name.trim() || !description.trim() || cost > power}
       />
