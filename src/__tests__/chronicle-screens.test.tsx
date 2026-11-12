@@ -86,6 +86,7 @@ const world = (o: Partial<World> = {}): World => ({
   invite_code: 'ABC234',
   turn_time_limit_hours: null,
   reminder_hours: 24,
+  objection_hours: 12,
   created_by: 'u-me',
   created_at: '',
   updated_at: '',
@@ -139,7 +140,11 @@ describe('Activity feed (DOW-37)', () => {
     expect(await screen.findByText('Solara · Command Race: founded Karak')).toBeTruthy();
     expect(cards()).toHaveLength(actions.length);
     const text = (i: number) => cards()[i].props.children.join('');
-    expect(text(0)).toContain('Command Race: Host of Karak took Underhold');
+    // DOW-53: the newest action was objected to and undone; it stays in the feed, marked.
+    expect(text(0)).toContain('Shape Land: Hills');
+    expect(screen.getByText(/objected:.*That hill is in my sea/)).toBeTruthy();
+    expect(screen.getByText('Undone by vote (2 to 0); its cost was refunded.')).toBeTruthy();
+    expect(text(1)).toContain('Command Race: Host of Karak took Underhold');
     // DOW-55: the battle, die by die.
     expect(
       screen.getByText(/Won against Pale Guard: 5 \+ 4 \+ 1 = 10 vs 2 \+ 2 \+ 1 = 5/),
@@ -234,6 +239,38 @@ describe('Activity feed (DOW-37)', () => {
     game.loadGameEvents.mockResolvedValue(events.filter((e) => e.type !== 'action_taken'));
     await render(<ChronicleScreen />);
     expect(await screen.findByText('Nothing has happened yet')).toBeTruthy();
+  });
+});
+
+describe('Ages and undone actions in the chronicle (DOW-52/53)', () => {
+  // A Second Age begins after the fixture, and a god acts in it.
+  const last = events[events.length - 1];
+  const action = events.find((e) => e.type === 'action_taken')!;
+  const later: GameEvent[] = [
+    {
+      ...last,
+      seq: last.seq + 1,
+      type: 'age_advanced',
+      god_id: null,
+      payload: { age: 2, name: 'Second Age', years_per_round: 100, round: 9 },
+    },
+    {
+      ...action,
+      seq: last.seq + 2,
+      age: 2,
+      round: 9,
+      payload: { ...(action.payload as object), choice: 'desert', description: 'Dry times' },
+    },
+  ];
+
+  it('marks where a new age begins, in the feed and the History Chart', async () => {
+    game.loadGameEvents.mockResolvedValue([...events, ...later]);
+    await render(<ChronicleScreen />);
+    expect(await screen.findAllByText('The Second Age begins')).toHaveLength(1);
+    await fireEvent.press(screen.getByLabelText('History'));
+    expect(screen.getAllByText('The Second Age begins')).toHaveLength(1);
+    // The undone hill stays in the chart, marked.
+    expect(screen.getAllByText(/Shape Land: Hills \(undone\)/).length).toBeGreaterThan(0);
   });
 });
 

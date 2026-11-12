@@ -42,6 +42,7 @@ export type Database = {
           turn_time_limit_hours: number | null;
           /** Hours a turn can wait before its player is reminded (0 = never). */
           reminder_hours: number;
+          objection_hours: number;
           created_by: string;
           created_at: string;
           updated_at: string;
@@ -54,6 +55,7 @@ export type Database = {
           invite_code?: string;
           turn_time_limit_hours?: number | null;
           reminder_hours?: number;
+          objection_hours?: number;
           created_by?: string;
           created_at?: string;
           updated_at?: string;
@@ -62,6 +64,7 @@ export type Database = {
           name?: string;
           turn_time_limit_hours?: number | null;
           reminder_hours?: number;
+          objection_hours?: number;
         };
         Relationships: [
           {
@@ -346,6 +349,13 @@ export type Database = {
         Args: { target_world: string; avatar: string; intent: string; args: Json };
         Returns: string | null;
       };
+      propose_next_age: { Args: { target_world: string }; Returns: string };
+      object_to_action: {
+        Args: { target_world: string; action_seq: number; reason: string };
+        Returns: string;
+      };
+      vote: { Args: { target_world: string; proposal: string; choice: string }; Returns: string };
+      close_proposal: { Args: { target_world: string; proposal: string }; Returns: string };
       command_city: {
         Args: { target_world: string; city: string; action: string; args: Json };
         Returns: string;

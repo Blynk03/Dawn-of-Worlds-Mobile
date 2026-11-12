@@ -66,7 +66,36 @@ describe('projectWorld against a game played by the server', () => {
       ['commandCity', 'Pale Guard', 6],
       ['commandRace', 'Host of Karak', 8],
       ['commandRace', 'Underhold', 8],
+      ['shapeLand', 'hills', 3], // objected to and undone
     ]);
+  });
+
+  it('lists an undone action, marked, without its effects (DOW-53)', () => {
+    const hill = view.actions[view.actions.length - 1];
+    expect(hill.retconned).toBe(true);
+    expect(hill.undoneBecauseOf).toBeNull();
+    expect(view.actions.filter((a) => a.retconned)).toEqual([hill]);
+    expect(view.retconned).toEqual([hill.seq]);
+    // The map matches the server (above): the hex is as it was, and its history leaves it out.
+    expect(view.map!.terrain[7 * view.map!.width]).not.toBe('hills');
+    expect(view.hexHistory[7 * view.map!.width] ?? []).not.toContain(hill.seq);
+  });
+
+  it('records the objection and its vote (DOW-53)', () => {
+    const hill = view.actions[view.actions.length - 1];
+    expect(view.proposals).toHaveLength(1);
+    const [objection] = view.proposals;
+    expect(objection).toMatchObject({
+      kind: 'objection',
+      targetSeq: hill.seq,
+      reason: 'That hill is in my sea',
+      status: 'undone',
+      coin: null,
+      solo: false,
+    });
+    expect(objection.godId).not.toBe(hill.godId);
+    expect(objection.votes).toEqual({ [objection.godId!]: 'undo', [hill.godId!]: 'undo' });
+    expect(objection.closesAt).toEqual(expect.any(String));
   });
 
   const entity = (name: string) => fixture.entities.find((e) => e.name === name)!;
@@ -365,6 +394,73 @@ describe('applying events incrementally', () => {
   it('gives the same result as projecting everything at once', () => {
     const stepByStep = events.reduce(applyEvent, EMPTY_GAME);
     expect(stepByStep).toEqual(projectWorld(events));
+  });
+
+  it('rebuilds the view when an earlier action is undone later (DOW-53)', () => {
+    const undo = events.findIndex((e) => e.type === 'action_retconned');
+    const before = projectWorld(events.slice(0, undo));
+    expect(before.actions[before.actions.length - 1].retconned).toBe(false);
+    expect(before.map!.terrain[7 * before.map!.width]).toBe('hills');
+    const after = projectWorld(events.slice(undo), before);
+    expect(after).toEqual(projectWorld(events));
+  });
+
+  it('follows a vote on the next age, and the age beginning (DOW-52)', () => {
+    const base = projectWorld(events);
+    const [a, b] = base.turnOrder;
+    const at = '2026-11-05T00:00:00Z';
+    let seq = base.lastSeq;
+    const ev = (type: string, god: string | null, payload: Record<string, unknown>): GameEvent => ({
+      seq: ++seq,
+      type,
+      age: 1,
+      round: base.round,
+      god_id: god,
+      payload,
+      created_at: at,
+    });
+    const voting = projectWorld(
+      [
+        ev('proposal_opened', a, {
+          proposal_id: 'p1',
+          kind: 'advance_age',
+          age: 2,
+          solo: false,
+          closes_at: null,
+          reason: '',
+        }),
+        ev('vote_cast', a, { proposal_id: 'p1', choice: 'yes' }),
+        ev('vote_cast', b, { proposal_id: 'p1', choice: 'yes' }),
+      ],
+      base,
+    );
+    expect(voting.proposals[1]).toMatchObject({
+      kind: 'advanceAge',
+      age: 2,
+      status: 'open',
+      votes: { [a]: 'yes', [b]: 'yes' },
+    });
+    expect(voting.agePending).toBe(false);
+    const passed = projectWorld(
+      [
+        ev('proposal_resolved', null, {
+          proposal_id: 'p1',
+          kind: 'advance_age',
+          outcome: 'passed',
+        }),
+      ],
+      voting,
+    );
+    expect(passed.proposals[1].status).toBe('passed');
+    expect(passed.agePending).toBe(true);
+    const next = projectWorld(
+      [ev('age_advanced', null, { age: 2, name: 'Second Age', years_per_round: 100, round: 9 })],
+      passed,
+    );
+    expect(next.age).toBe(2);
+    expect(next.agePending).toBe(false);
+    expect(next.ageStartedRound).toBe(9);
+    expect(next.ageChanges).toEqual([{ age: 2, name: 'Second Age', round: 9, seq }]);
   });
 
   it('ignores events it has already applied (realtime re-delivery)', () => {

@@ -4,6 +4,7 @@ import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { Button } from '@/components/form';
 import { Card, ErrorMessage, GodBadge, SectionLabel } from '@/components/game-ui';
 import { NudgeButton } from '@/components/nudge-button';
+import { TableVotes } from '@/components/table-votes';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import type { God } from '@/lib/database.types';
@@ -137,6 +138,15 @@ export function GamePanelView({
         )}
         <ErrorMessage message={actionError ?? error} />
       </Card>
+
+      <TableVotes
+        worldId={worldId}
+        view={view}
+        gods={gods}
+        myGodId={myGod?.id ?? null}
+        now={now}
+        onChanged={refresh}
+      />
 
       <SectionLabel>Turn order this round</SectionLabel>
       {view.turnOrder.map((godId, index) => (

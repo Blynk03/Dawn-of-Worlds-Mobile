@@ -14,6 +14,7 @@ import {
   setWorldMuted,
 } from '@/notifications/api';
 import { type PushStatus, registerForPush } from '@/notifications/push';
+import { OBJECTION_OPTIONS, setObjectionHours } from '@/game/api';
 import { useLobby } from '@/worlds/hooks';
 
 const DEVICE_STATUS: Record<PushStatus, string> = {
@@ -26,7 +27,7 @@ const DEVICE_STATUS: Record<PushStatus, string> = {
     'Notifications go to the Android app. In the browser, watch for the “new” badges on your worlds.',
 };
 
-/** DOW-16/28: notification settings for one world. */
+/** DOW-16/28: notification settings for one world; DOW-53: the objection window. */
 export default function WorldSettingsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { session } = useAuth();
@@ -64,10 +65,10 @@ export default function WorldSettingsScreen() {
     }
   };
 
-  const chooseReminder = async (hours: number) => {
+  const choose = async (save: (worldId: string, hours: number) => Promise<void>, hours: number) => {
     setError(null);
     try {
-      await setReminderHours(id, hours);
+      await save(id, hours);
       lobby.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -114,7 +115,26 @@ export default function WorldSettingsScreen() {
                 key={hours}
                 label={hours === 0 ? 'Off' : `${hours} hours`}
                 selected={world.reminder_hours === hours}
-                onPress={isHost ? () => chooseReminder(hours) : () => {}}
+                onPress={isHost ? () => choose(setReminderHours, hours) : () => {}}
+              />
+            ))}
+          </View>
+        </Card>
+
+        <Card>
+          <SectionLabel>Objections</SectionLabel>
+          <ThemedText type="small" themeColor="textSecondary">
+            For this long after an action, any other god can object to it. Every god then votes to
+            keep it, undo it (refunding it), or flip a coin.
+            {isHost ? '' : ' The host chooses this.'}
+          </ThemedText>
+          <View style={styles.wrap}>
+            {OBJECTION_OPTIONS.map((hours) => (
+              <Chip
+                key={hours}
+                label={hours === 0 ? 'Off' : hours === 1 ? '1 hour' : `${hours} hours`}
+                selected={(world.objection_hours ?? 12) === hours}
+                onPress={isHost ? () => choose(setObjectionHours, hours) : () => {}}
               />
             ))}
           </View>

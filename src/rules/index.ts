@@ -3,6 +3,7 @@
  * can run in the app and on the server.
  */
 export * from './actions';
+export * from './ages';
 export * from './dice';
 export * from './power';
 export * from './ruleset';
