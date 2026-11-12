@@ -3,7 +3,7 @@ import type { WorldEventRow } from '@/lib/database.types';
 import { supabase } from '@/lib/supabase';
 import { friendlyError } from '@/worlds/errors';
 
-import type { GameEvent } from './project';
+import type { GameEvent, StructureView } from './project';
 
 function client() {
   if (!supabase) throw new Error('The app is not connected to Supabase.');
@@ -224,6 +224,75 @@ export async function createAvatar(
   if (error) throw new Error(friendlyError(error));
 }
 
+/** DOW-48: what a city can be told to do. */
+export type CityCommand =
+  | {
+      action: 'build';
+      name: string;
+      structure_type: StructureView['structureType'];
+      description: string;
+    }
+  | { action: 'raiseArmy'; name: string; description: string };
+
+/** DOW-48: Command City: build something, or raise an army (one per city per turn). */
+export async function commandCity(
+  worldId: string,
+  cityId: string,
+  command: CityCommand,
+): Promise<void> {
+  const { action, ...args } = command;
+  const { error } = await client().rpc('command_city', {
+    target_world: worldId,
+    city: cityId,
+    action,
+    args,
+  });
+  if (error) throw new Error(friendlyError(error));
+}
+
+/** DOW-48: march an army to a land hex (Command Race). */
+export async function marchArmy(
+  worldId: string,
+  armyId: string,
+  hex: { x: number; y: number },
+  description: string,
+): Promise<void> {
+  const { error } = await client().rpc('march_army', {
+    target_world: worldId,
+    army: armyId,
+    hex_x: hex.x,
+    hex_y: hex.y,
+    description,
+  });
+  if (error) throw new Error(friendlyError(error));
+}
+
+export type AttackOrder = {
+  armyId: string;
+  target: { kind: 'army' | 'city'; id: string };
+  attackerModifiers: string[];
+  defenderModifiers: string[];
+  /** Destroy the losers outright (and the city) instead of scattering them, for more power. */
+  utterlyDestroy: boolean;
+  description: string;
+};
+
+/** DOW-54/55/41: attack an army or a city; the server rolls the battles. */
+export async function attack(worldId: string, order: AttackOrder): Promise<'won' | 'lost'> {
+  const { data, error } = await client().rpc('attack', {
+    target_world: worldId,
+    army: order.armyId,
+    target_kind: order.target.kind,
+    target: order.target.id,
+    attacker_modifiers: order.attackerModifiers,
+    defender_modifiers: order.defenderModifiers,
+    utterly_destroy: order.utterlyDestroy,
+    description: order.description,
+  });
+  if (error) throw new Error(friendlyError(error));
+  return data === 'lost' ? 'lost' : 'won';
+}
+
 /** What an avatar can be told to do (DOW-45), with that action's details. */
 export type AvatarCommand =
   | { intent: 'deed'; description: string }
@@ -238,6 +307,7 @@ export type AvatarCommand =
   | { intent: 'createOrder'; race: string; name: string; order_type: string; purpose: string }
   | { intent: 'commandOrder'; order: string; directive: string }
   | { intent: 'purifyCity' | 'corruptCity'; city: string; description: string }
+  | ({ intent: 'commandCity'; city: string } & CityCommand)
   | {
       intent: 'createRace';
       name: string;

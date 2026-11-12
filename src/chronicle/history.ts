@@ -20,10 +20,30 @@ export const POWER_NAMES: Record<string, string> = {
   corruptRegion: 'Corrupt Region',
   createOrder: 'Create Order',
   commandOrder: 'Command Order',
+  commandCity: 'Command City',
   createAvatar: 'Create Avatar',
   commandAvatar: 'Command Avatar',
   resurrectAvatar: 'Resurrect Avatar',
 };
+
+/** DOW-48: "Karak builds The Iron Wall", "Karak raises the Host of Karak". */
+function cityDeed(action: ActionRecord, verbs: [string, string] = ['raises', 'builds']): string {
+  const city = action.target?.name ?? 'a city';
+  return `${city} ${action.intent === 'raiseArmy' ? verbs[0] : verbs[1]} ${action.choice}`;
+}
+
+/** DOW-55: "Host of Karak took Underhold", "Host of Karak fell attacking Karak". */
+function attackDeed(action: ActionRecord): string {
+  const battle = action.battle;
+  if (!battle) return `attacked ${action.choice}`;
+  if (battle.outcome === 'lost') return `${battle.armyName} fell attacking ${action.choice}`;
+  if (action.target?.kind === 'city') {
+    const fate = battle.cityOutcome === 'destroyed' ? 'razed' : 'took';
+    return `${battle.armyName} ${fate} ${action.choice}`;
+  }
+  const destroyed = battle.destructionCost > 0 ? 'destroyed' : 'scattered';
+  return `${battle.armyName} ${destroyed} ${action.choice}`;
+}
 
 /** What an avatar did when commanded (DOW-45). */
 function avatarDeed(action: ActionRecord, name: string): string {
@@ -42,6 +62,9 @@ function avatarDeed(action: ActionRecord, name: string): string {
       return `${name} corrupts ${action.choice}${now}`;
     case 'createRace':
       return `${name} creates the ${action.choice}`;
+    case 'build':
+    case 'raiseArmy':
+      return `${name} bids ${cityDeed(action, ['raise', 'build'])}`;
     default:
       return `${name}, a mortal deed`;
   }
@@ -60,6 +83,11 @@ export function describeAction(action: ActionRecord): { power: string; what: str
   else if (action.power === 'commandAvatar' && action.avatar) {
     what = avatarDeed(action, action.avatar.name);
   } else if (action.intent === 'foundCity') what = `founded ${action.choice}`;
+  else if (action.power === 'commandCity') what = cityDeed(action);
+  else if (action.intent === 'march') {
+    const [x, y] = action.hexes[0] ?? [0, 0];
+    what = `${action.choice} marched to (${x}, ${y})`;
+  } else if (action.intent === 'attack') what = attackDeed(action);
   else if (action.power === 'resurrectAvatar') what = `${action.choice} returns`;
   else if (action.power.startsWith('advance') && action.target) {
     what = `${action.target.name}, the greatest at ${action.choice}`;
@@ -103,6 +131,18 @@ export function actionEntities(view: GameView, action: ActionRecord): EntityRef[
   }
   const avatar = view.avatars.find((a) => a.id === action.avatar?.id);
   if (avatar) raceRef(avatar.raceId);
+  // Armies count as their city: the one marching or attacking, the one attacked, a new one.
+  const armyCity = (armyId: string | null | undefined) => {
+    const army = view.armies.find((a) => a.id === armyId);
+    const city = view.cities.find((c) => c.id === army?.cityId);
+    if (city) {
+      raceRef(city.raceId);
+      add({ id: city.id, kind: 'city', name: city.name });
+    }
+  };
+  armyCity(action.battle?.armyId);
+  if (action.target?.kind === 'army') armyCity(action.target.id);
+  for (const army of view.armies) if (army.createdSeq === action.seq) armyCity(army.id);
   if (action.target?.kind === 'city') {
     const city = view.cities.find((c) => c.id === action.target!.id);
     if (city) {

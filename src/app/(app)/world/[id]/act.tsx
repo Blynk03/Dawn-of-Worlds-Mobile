@@ -19,6 +19,7 @@ import {
   OrderFields,
   OrderPicker,
 } from '@/components/order-avatar-forms';
+import { AttackForm, CommandCityForm, MarchForm, type WarTarget } from '@/components/war-forms';
 import { useAuth } from '@/auth/auth-provider';
 import { Button, TextField } from '@/components/form';
 import { Chip, ErrorMessage, SectionLabel } from '@/components/game-ui';
@@ -28,14 +29,17 @@ import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import {
   advance,
+  attack,
   changeAlignment,
   commandAvatar,
+  commandCity,
   commandOrder,
   createAvatar,
   createOrder,
   createRace,
   createSubrace,
   foundCity,
+  marchArmy,
   resurrectAvatar,
   takeAction,
 } from '@/game/api';
@@ -73,6 +77,7 @@ const INTENT_FORM: Record<AvatarIntent, FormKind> = {
   purifyCity: 'purify',
   corruptCity: 'corrupt',
   createRace: 'createRace',
+  commandCity: 'commandCity',
 };
 const isWater = (terrain: string) => terrainInfo(terrain).water;
 
@@ -87,7 +92,8 @@ type RaceDraft = {
  * DOW-26: the action composer. Pick a power (grouped, with this age's cost), choose where on the
  * map, describe it, and confirm. Powers: Shape Land and Shape Climate (DOW-31/32), Create Race
  * (DOW-34), Command Race to found a city (DOW-35), Create Subrace (DOW-43), Purify / Corrupt
- * (DOW-46, once per target per turn: DOW-40) and Advance Civilization / City (DOW-47).
+ * (DOW-46, once per target per turn: DOW-40), Advance Civilization / City (DOW-47), orders and
+ * avatars (DOW-44/45), and Command City, marching and attacking (DOW-48/54/55/41).
  */
 export default function ActScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -134,6 +140,9 @@ export default function ActScreen() {
   }>({ name: '', avatarType: 'High priest', description: '', raceId: null });
   const [avatarId, setAvatarId] = useState<string | null>(null);
   const [avatarIntent, setAvatarIntent] = useState<AvatarIntent | null>(null);
+  // Armies (DOW-48/54/55)
+  const [armyId, setArmyId] = useState<string | null>(null);
+  const [warTarget, setWarTarget] = useState<WarTarget | null>(null);
   // Command Avatar runs another power's form, for the price of Command Avatar.
   const viaAvatar = kind === 'commandAvatar';
   const fk: FormKind | null = viaAvatar
@@ -173,6 +182,15 @@ export default function ActScreen() {
     }
     if (fk === 'createSubrace' && chosenRace) {
       return new Set(subraceCandidates(view, chosenRace, isWater, near));
+    }
+    if (fk === 'commandCity') {
+      return new Set(view.cities.filter((c) => c.status === 'active').map((c) => index(c.hex)));
+    }
+    if (fk === 'attack') {
+      return new Set([
+        ...view.cities.filter((c) => c.status === 'active').map((c) => index(c.hex)),
+        ...view.armies.filter((a) => a.status === 'active').map((a) => index(a.hex)),
+      ]);
     }
     if (fk === 'advance' || fk === 'purify' || fk === 'corrupt') {
       const aligning = fk !== 'advance';
@@ -239,6 +257,16 @@ export default function ActScreen() {
   if (!myAvatars.some((a) => a.status !== 'active')) {
     disabledReasons.resurrectAvatar = 'None of your avatars is slain';
   }
+  const standingCities = view.cities.filter((c) => c.status === 'active');
+  if (standingCities.length === 0) {
+    disabledReasons.commandCity = 'No standing cities yet';
+  } else if (!standingCities.some((c) => presentIn(view, me, c.raceId))) {
+    disabledReasons.commandCity = 'You need an order or avatar among a city’s race';
+  }
+  if (!view.armies.some((a) => a.status === 'active' && presentIn(view, me, a.raceId))) {
+    disabledReasons.march = 'No army you can command: raise one with Command City';
+    disabledReasons.attack = disabledReasons.march;
+  }
   if (view.races.length === 0) {
     for (const k of ['foundCity', 'createSubrace', 'advance', 'createOrder'] as const) {
       disabledReasons[k] = 'No races yet: create one first';
@@ -258,6 +286,8 @@ export default function ActScreen() {
     setOrderId(null);
     setAvatarId(null);
     setAvatarIntent(null);
+    setArmyId(null);
+    setWarTarget(null);
     if (next === 'shapeLand') setChoice('mountains');
     if (next === 'shapeClimate') setChoice('rain');
   };
@@ -285,6 +315,22 @@ export default function ActScreen() {
       else setNote('Choose a highlighted hex, next to the parent race’s land.');
     } else if (fk === 'createAvatar') {
       setHex(index === hex ? null : index);
+    } else if (fk === 'commandCity') {
+      const city = view.cities.find(
+        (c) => c.status === 'active' && c.hex.x === tapped.x && c.hex.y === tapped.y,
+      );
+      if (city) setTargetId(city.id);
+      else setNote('Tap a city.');
+    } else if (fk === 'march') {
+      if (isWater(map.terrain[index] ?? '')) setNote('Armies march on land; choose a land hex.');
+      else setHex(index === hex ? null : index);
+    } else if (fk === 'attack') {
+      const at = (h: { x: number; y: number }) => h.x === tapped.x && h.y === tapped.y;
+      const city = view.cities.find((c) => c.status === 'active' && at(c.hex));
+      const army = view.armies.find((a) => a.status === 'active' && a.id !== armyId && at(a.hex));
+      if (city) setWarTarget({ kind: 'city', id: city.id });
+      else if (army) setWarTarget({ kind: 'army', id: army.id });
+      else setNote('Tap a city or an army to attack.');
     } else if (fk === 'advance' || fk === 'purify' || fk === 'corrupt') {
       const aligning = fk !== 'advance';
       if (targetKind === 'region') {
@@ -704,7 +750,65 @@ export default function ActScreen() {
     );
   }
 
-  if (fk === 'createOrder') {
+  if (fk === 'commandCity') {
+    form = (
+      <CommandCityForm
+        view={view}
+        godId={me}
+        viaAvatar={viaAvatar}
+        cityId={targetId}
+        onCity={setTargetId}
+        cost={cost}
+        power={myPower}
+        busy={busy}
+        onSubmit={(cityId, command) =>
+          run(() =>
+            viaAvatar
+              ? commandAvatar(id, avatarId!, { intent: 'commandCity', city: cityId, ...command })
+              : commandCity(id, cityId, command),
+          )
+        }
+      />
+    );
+  } else if (fk === 'march') {
+    form = (
+      <MarchForm
+        view={view}
+        godId={me}
+        armyId={armyId}
+        onArmy={setArmyId}
+        destination={hex === null ? null : hexLabel(hex)}
+        cost={cost}
+        power={myPower}
+        busy={busy}
+        onSubmit={(text) => run(() => marchArmy(id, armyId!, hexFromIndex(hex!, map.width), text))}
+      />
+    );
+  } else if (fk === 'attack') {
+    form = (
+      <AttackForm
+        view={view}
+        godId={me}
+        armyId={armyId}
+        onArmy={(a) => {
+          setArmyId(a);
+          if (warTarget?.id === a) setWarTarget(null);
+        }}
+        target={warTarget}
+        onTarget={setWarTarget}
+        prices={{
+          attack: cost,
+          army: priceOf('commandCity'),
+          city: priceOf('commandRace'),
+        }}
+        power={myPower}
+        busy={busy}
+        onSubmit={(order) =>
+          run(() => attack(id, { ...order, armyId: armyId!, target: warTarget! }))
+        }
+      />
+    );
+  } else if (fk === 'createOrder') {
     const raceName = view.races.find((r) => r.id === chosenRace)?.name;
     form = (
       <>
@@ -953,12 +1057,25 @@ export default function ActScreen() {
     </ScrollView>
   );
 
+  const warHex = (() => {
+    const place =
+      fk === 'commandCity'
+        ? view.cities.find((c) => c.id === targetId)
+        : fk === 'attack' && warTarget
+          ? warTarget.kind === 'city'
+            ? view.cities.find((c) => c.id === warTarget.id)
+            : view.armies.find((a) => a.id === warTarget.id)
+          : undefined;
+    return place ? hexIndex(place.hex, map.width) : null;
+  })();
   const pickedHex =
-    fk === 'advance' || fk === 'purify' || fk === 'corrupt'
-      ? targetHex
-      : fk === 'commandOrder' || fk === 'deed' || fk === 'resurrectAvatar' || fk === 'createOrder'
-        ? null
-        : hex;
+    fk === 'commandCity' || fk === 'attack'
+      ? warHex
+      : fk === 'advance' || fk === 'purify' || fk === 'corrupt'
+        ? targetHex
+        : fk === 'commandOrder' || fk === 'deed' || fk === 'resurrectAvatar' || fk === 'createOrder'
+          ? null
+          : hex;
   const mapSelection = shaping ? selected : pickedHex === null ? undefined : new Set([pickedHex]);
   const mapView = (
     <View style={styles.fill}>

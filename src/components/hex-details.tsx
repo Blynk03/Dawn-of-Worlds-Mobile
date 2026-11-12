@@ -44,6 +44,9 @@ export function HexDetails({
     map.climate[index] && map.climate[index] !== 'none' ? climateInfo(map.climate[index]) : null;
   const changes = view ? hexChanges(view, index) : [];
   const { race, city } = view ? settlementsAt(view, hex) : { race: null, city: null };
+  const armies = view
+    ? view.armies.filter((a) => a.status === 'active' && a.hex.x === hex.x && a.hex.y === hex.y)
+    : [];
   const cityRace = city && view ? view.races.find((r) => r.id === city.raceId) : null;
   const regionAlignment = map.alignment?.[index] ?? 0;
   const regionName = regionAlignmentName(regionAlignment);
@@ -76,11 +79,21 @@ export function HexDetails({
       ) : null}
       {city ? (
         <ThemedText type="small">
-          <ThemedText type="smallBold">City of {city.name}</ThemedText>
+          <ThemedText type="smallBold">
+            {city.status === 'active'
+              ? `City of ${city.name}`
+              : `${city.status === 'ruined' ? 'Ruins' : 'Remains'} of ${city.name}`}
+          </ThemedText>
           {cityRace ? ` · built by the ${cityRace.name}` : ''}
-          {` · ${alignmentLabel(city.alignment)}`}
+          {city.status === 'active' ? ` · ${alignmentLabel(city.alignment)}` : ''}
         </ThemedText>
       ) : null}
+      {armies.map((a) => (
+        <ThemedText key={a.id} type="small">
+          <ThemedText type="smallBold">⚑ {a.name}</ThemedText>
+          {` · raised in ${view?.cities.find((c) => c.id === a.cityId)?.name ?? 'a city'}`}
+        </ThemedText>
+      ))}
       {changes.length === 0 ? (
         <ThemedText type="small" themeColor="textSecondary">
           Untouched since the dawn of the world.

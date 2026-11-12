@@ -124,6 +124,44 @@ select pg_temp.act_sql('11111111-1111-1111-1111-111111111111', $q$
   select public.command_avatar('11111111-1111-1111-1111-111111111111',
     (select id from public.world_entities where name = 'Durin'), 'deed',
     '{"description": "Durin slays the wyrm of the north"}')$q$);
+-- DOW-48/54/55: a wall and an army for Karak; the Deep Dwarves found Underhold and raise a guard;
+-- the Host of Karak marches and takes Underhold. The dice are scripted so the fixture is stable.
+select pg_temp.act_sql('11111111-1111-1111-1111-111111111111', $q$
+  select public.command_city('11111111-1111-1111-1111-111111111111',
+    (select id from public.world_entities where name = 'Karak'), 'build',
+    '{"name": "The Iron Wall", "structure_type": "wall", "description": "Walls of black iron"}')$q$);
+select pg_temp.act_sql('11111111-1111-1111-1111-111111111111', $q$
+  select public.command_city('11111111-1111-1111-1111-111111111111',
+    (select id from public.world_entities where name = 'Karak'), 'raiseArmy',
+    '{"name": "Host of Karak", "description": "The halls empty for war"}')$q$);
+select pg_temp.act_sql('11111111-1111-1111-1111-111111111111', $q$
+  select public.found_city('11111111-1111-1111-1111-111111111111',
+    (select id from public.world_entities where name = 'Deep Dwarves'), 'Underhold', 7, 4, 'Into the dark')$q$);
+select pg_temp.act_sql('11111111-1111-1111-1111-111111111111', $q$
+  select public.command_city('11111111-1111-1111-1111-111111111111',
+    (select id from public.world_entities where name = 'Underhold'), 'raiseArmy',
+    '{"name": "Pale Guard", "description": "They will not be ruled"}')$q$);
+select pg_temp.act_sql('11111111-1111-1111-1111-111111111111', $q$
+  select public.march_army('11111111-1111-1111-1111-111111111111',
+    (select id from public.world_entities where name = 'Host of Karak'), 6, 5, 'Down to the river')$q$);
+create table pg_temp.dice (n serial, value int);
+insert into pg_temp.dice (value) values (5), (4), (2), (2);
+alter function public._roll_die(int) rename to _roll_die_real;
+create function public._roll_die(sides int) returns int language plpgsql set search_path = '' as $$
+declare v int; k int;
+begin
+  select n, value into k, v from pg_temp.dice order by n limit 1;
+  if k is null then return public._roll_die_real(sides); end if;
+  delete from pg_temp.dice where n = k;
+  return v;
+end $$;
+select pg_temp.act_sql('11111111-1111-1111-1111-111111111111', $q$
+  select public.attack('11111111-1111-1111-1111-111111111111',
+    (select id from public.world_entities where name = 'Host of Karak'), 'city',
+    (select id from public.world_entities where name = 'Underhold'), '["Steel"]', '["High ground"]', false,
+    'The Host brings the Deep Dwarves to heel')$q$);
+drop function public._roll_die(int);
+alter function public._roll_die_real(int) rename to _roll_die;
 select pg_temp.play('11111111-1111-1111-1111-111111111111', false, false);
 reset role;
 update public.world_state set turn_deadline = now() - interval '1 minute'
@@ -146,7 +184,8 @@ select jsonb_pretty(jsonb_build_object(
     from public.god_power where world_id = '11111111-1111-1111-1111-111111111111'),
   'entities', (select jsonb_agg(jsonb_build_object('id', id, 'kind', kind, 'name', name, 'race_id', race_id,
       'god_id', god_id, 'alignment', alignment, 'hex_x', hex_x, 'hex_y', hex_y, 'parent_race_id', parent_race_id,
-      'status', status, 'order_type', order_type, 'purpose', purpose, 'avatar_type', avatar_type)
+      'status', status, 'order_type', order_type, 'purpose', purpose, 'avatar_type', avatar_type,
+      'city_id', city_id, 'structure_type', structure_type)
       order by created_seq, kind desc)
     from public.world_entities where world_id = '11111111-1111-1111-1111-111111111111'),
   'advancements', (select coalesce(jsonb_agg(jsonb_build_object('entity_id', entity_id, 'field', field,

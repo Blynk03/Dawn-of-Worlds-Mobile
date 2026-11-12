@@ -9,6 +9,7 @@ import {
   threadsFor,
   toggleReaction,
 } from '@/chronicle/social';
+import { BattleSummary } from '@/components/battle-summary';
 import { Button, TextField } from '@/components/form';
 import { Card, ErrorMessage, GodBadge } from '@/components/game-ui';
 import { MapThumbnail } from '@/components/map-thumbnail';
@@ -126,6 +127,7 @@ export function FeedCard({
       <View style={styles.body}>
         <View style={[styles.fill, styles.gap]}>
           <ThemedText>{action.description}</ThemedText>
+          {action.battle ? <BattleSummary battle={action.battle} target={action.choice} /> : null}
           {entities.length > 0 ? (
             <View style={styles.row}>
               {entities.map((e) => (

@@ -84,9 +84,15 @@ describe('Atlas (DOW-34/35)', () => {
     expect(screen.getByLabelText('Order Hammers of the Deep')).toBeTruthy();
     expect(screen.getByText(/· Knights · Solara’s/)).toBeTruthy();
     expect(screen.getByText('Guard the mountain gates')).toBeTruthy();
-    expect(screen.getByText('1 city')).toBeTruthy();
+    expect(screen.getAllByText('1 city')).toHaveLength(2); // Karak; the Deep Dwarves' Underhold
     expect(screen.getByLabelText('City of Karak')).toBeTruthy();
     expect(screen.getByText('“A hall is carved into the hill”')).toBeTruthy();
+    // DOW-48/41: what Karak built and raised, and the ruins of Underhold.
+    expect(screen.getByText('Built: The Iron Wall (wall)')).toBeTruthy();
+    expect(screen.getByLabelText('Army Host of Karak')).toBeTruthy();
+    expect(screen.getByText(/· at hex 7, 4/)).toBeTruthy();
+    expect(screen.getByText(/· scattered/)).toBeTruthy(); // the Pale Guard
+    expect(screen.getByText(/Underhold.*\(in ruins\)/)).toBeTruthy();
   });
 
   it('explains how to start when there are no races', async () => {
@@ -142,6 +148,16 @@ describe('Hex details for settled hexes', () => {
     expect(screen.getByText('City of Karak')).toBeTruthy();
     expect(screen.getByText(/built by the Dwarves/)).toBeTruthy();
     expect(screen.getByText(/Command Race: founded Karak/)).toBeTruthy();
+  });
+
+  it('shows ruins, the army standing there and the battle (DOW-41/48/55)', async () => {
+    await render(
+      <HexDetails hex={{ x: 7, y: 4 }} map={map} view={view} gods={gods} onClose={() => {}} />,
+    );
+    expect(screen.getByText('Ruins of Underhold')).toBeTruthy();
+    expect(screen.getByText('⚑ Host of Karak')).toBeTruthy();
+    expect(screen.getByText(/raised in Karak/)).toBeTruthy();
+    expect(screen.getByText(/Command Race: Host of Karak took Underhold/)).toBeTruthy();
   });
 
   it("shows a region's alignment once it has changed (DOW-46)", async () => {

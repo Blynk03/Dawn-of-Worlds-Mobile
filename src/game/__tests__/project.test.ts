@@ -60,7 +60,111 @@ describe('projectWorld against a game played by the server', () => {
       ['commandOrder', 'Hammers of the Deep', 4],
       ['createAvatar', 'Durin', 10],
       ['commandAvatar', 'Durin', 2],
+      ['commandCity', 'The Iron Wall', 6],
+      ['commandCity', 'Host of Karak', 6],
+      ['commandRace', 'Underhold', 8],
+      ['commandCity', 'Pale Guard', 6],
+      ['commandRace', 'Host of Karak', 8],
+      ['commandRace', 'Underhold', 8],
     ]);
+  });
+
+  const entity = (name: string) => fixture.entities.find((e) => e.name === name)!;
+
+  it("matches the server's armies and structures after marching and battle (DOW-48/55)", () => {
+    expect(
+      view.armies.map((a) => [a.id, a.name, a.raceId, a.cityId, a.hex.x, a.hex.y, a.status]),
+    ).toEqual(
+      fixture.entities
+        .filter((e) => e.kind === 'army')
+        .map((e) => [e.id, e.name, e.race_id, e.city_id, e.hex_x, e.hex_y, e.status]),
+    );
+    expect(view.structures.map((s) => [s.id, s.name, s.structureType, s.cityId])).toEqual(
+      fixture.entities
+        .filter((e) => e.kind === 'structure')
+        .map((e) => [e.id, e.name, e.structure_type, e.city_id]),
+    );
+    expect(view.cities.map((c) => [c.name, c.status])).toEqual(
+      fixture.entities.filter((e) => e.kind === 'city').map((e) => [e.name, e.status]),
+    );
+  });
+
+  it('records the battle: dice, bonuses, fatigue and outcome (DOW-54/55)', () => {
+    const attack = view.actions.find((a) => a.intent === 'attack')!;
+    expect(attack.battle).toEqual({
+      armyId: entity('Host of Karak').id,
+      armyName: 'Host of Karak',
+      attackerModifiers: ['Steel'],
+      defenderModifiers: ['High ground'],
+      battles: [
+        {
+          defenderId: entity('Pale Guard').id,
+          defenderName: 'Pale Guard',
+          attackerDice: [5, 4],
+          defenderDice: [2, 2],
+          attackerBonus: 1,
+          defenderBonus: 1,
+          fatigue: 0,
+          attackerTotal: 10,
+          defenderTotal: 5,
+          winner: 'attacker',
+        },
+      ],
+      outcome: 'won',
+      cityOutcome: 'ruined',
+      destructionCost: 0,
+    });
+    expect(attack.target).toMatchObject({ kind: 'city', name: 'Underhold' });
+  });
+
+  it('follows utter destruction and lost battles', () => {
+    const attack = view.actions.find((a) => a.intent === 'attack')!;
+    const last = events[events.length - 1];
+    const payload = (events.find((e) => e.seq === attack.seq)!.payload ?? {}) as Record<
+      string,
+      unknown
+    >;
+    const battle = payload.battle as Record<string, unknown>;
+    // The same attack, but lost.
+    const before = projectWorld(events.filter((e) => e.seq < attack.seq));
+    const lost = applyEvent(before, {
+      ...last,
+      type: 'action_taken',
+      seq: attack.seq,
+      god_id: attack.godId,
+      payload: {
+        ...payload,
+        battle: {
+          ...battle,
+          outcome: 'lost',
+          scattered: [entity('Host of Karak').id],
+          city_outcome: null,
+        },
+      },
+    });
+    expect(lost.armies.find((a) => a.name === 'Host of Karak')).toMatchObject({
+      status: 'scattered',
+      hex: { x: 6, y: 5 }, // it doesn't advance
+    });
+    expect(lost.cities.find((c) => c.name === 'Underhold')!.status).toBe('active');
+    // The same attack, utterly destroying everything.
+    const razed = applyEvent(before, {
+      ...last,
+      type: 'action_taken',
+      seq: attack.seq,
+      god_id: attack.godId,
+      payload: {
+        ...payload,
+        battle: {
+          ...battle,
+          scattered: [],
+          destroyed: [entity('Pale Guard').id, entity('Underhold').id],
+          city_outcome: 'destroyed',
+        },
+      },
+    });
+    expect(razed.armies.find((a) => a.name === 'Pale Guard')!.status).toBe('destroyed');
+    expect(razed.cities.find((c) => c.name === 'Underhold')!.status).toBe('destroyed');
   });
 
   it("matches the server's orders, with their kind, purpose and creator (DOW-44)", () => {

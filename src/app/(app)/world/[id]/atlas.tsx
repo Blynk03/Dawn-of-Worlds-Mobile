@@ -17,16 +17,18 @@ import { alignmentLabel, ORDER_TYPE_NAMES } from '@/game/civilization';
 import {
   type AdvancementView,
   ageName,
+  type ArmyView,
   type AvatarView,
   type CityView,
   type OrderView,
   type RaceView,
+  type StructureView,
 } from '@/game/project';
 import type { God } from '@/lib/database.types';
 import { useTheme } from '@/hooks/use-theme';
 import { useLobby } from '@/worlds/hooks';
 
-/** DOW-34/35: every race in the world, with its sects and cities. */
+/** DOW-34/35/48: every race in the world, with its orders, cities, their works and armies. */
 export default function AtlasScreen() {
   // `entity` (a race or city id) scrolls to and highlights its card, e.g. from a chronicle link.
   const { id, entity } = useLocalSearchParams<{ id: string; entity?: string }>();
@@ -66,6 +68,8 @@ export default function AtlasScreen() {
               parentName={view.races.find((r) => r.id === race.parentId)?.name ?? null}
               subraces={view.races.filter((r) => r.parentId === race.id).map((r) => r.name)}
               advancements={view.advancements}
+              structures={view.structures}
+              armies={view.armies}
               gods={lobby.gods}
               highlight={race.id === targetRace ? entity : undefined}
               onLayoutY={
@@ -101,6 +105,8 @@ function RaceCard({
   parentName,
   subraces,
   advancements,
+  structures,
+  armies,
   gods,
   highlight,
   onLayoutY,
@@ -112,6 +118,8 @@ function RaceCard({
   parentName: string | null;
   subraces: string[];
   advancements: AdvancementView[];
+  structures: StructureView[];
+  armies: ArmyView[];
   gods: God[];
   /** The id of this race, or one of its cities, to highlight. */
   highlight?: string;
@@ -196,7 +204,11 @@ function RaceCard({
             key={city.id}
             style={[styles.city, highlight === city.id && [ring, styles.cityHighlight]]}
             accessibilityLabel={`City of ${city.name}`}>
-            <ThemedText type="smallBold">{city.name}</ThemedText>
+            <ThemedText type="smallBold">
+              {city.name}
+              {city.status === 'ruined' ? ' (in ruins)' : ''}
+              {city.status === 'destroyed' ? ' (destroyed)' : ''}
+            </ThemedText>
             <ThemedText type="small" themeColor="textSecondary">
               Hex {city.hex.x}, {city.hex.y} · {alignmentLabel(city.alignment)} · founded at{' '}
               {founder?.name ?? 'a god'}&apos;s command in the {ageName(city.age)}, round{' '}
@@ -204,10 +216,47 @@ function RaceCard({
             </ThemedText>
             <ThemedText type="small">“{city.description}”</ThemedText>
             <Greatest fields={greatestFields(advancements, city.id)} />
+            <CityWorks
+              structures={structures.filter((s) => s.cityId === city.id)}
+              armies={armies.filter((a) => a.cityId === city.id)}
+            />
           </View>
         );
       })}
     </Card>
+  );
+}
+
+const STRUCTURE_NAMES: Record<StructureView['structureType'], string> = {
+  wonder: 'wonder',
+  wall: 'wall',
+  school: 'school',
+  tower: 'tower',
+  temple: 'temple',
+  other: 'work',
+};
+
+/** DOW-48: what a city has built, and the armies it raised (and where they are). */
+function CityWorks({ structures, armies }: { structures: StructureView[]; armies: ArmyView[] }) {
+  return (
+    <>
+      {structures.length > 0 ? (
+        <ThemedText type="small" themeColor="textSecondary">
+          Built:{' '}
+          {structures.map((s) => `${s.name} (${STRUCTURE_NAMES[s.structureType]})`).join(', ')}
+        </ThemedText>
+      ) : null}
+      {armies.map((a) => (
+        <ThemedText key={a.id} type="small" accessibilityLabel={`Army ${a.name}`}>
+          ⚑ <ThemedText type="smallBold">{a.name}</ThemedText>
+          {a.status === 'active'
+            ? ` · at hex ${a.hex.x}, ${a.hex.y}`
+            : a.status === 'scattered'
+              ? ' · scattered'
+              : ' · destroyed'}
+        </ThemedText>
+      ))}
+    </>
   );
 }
 

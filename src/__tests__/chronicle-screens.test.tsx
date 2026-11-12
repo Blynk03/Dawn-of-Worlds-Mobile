@@ -139,7 +139,12 @@ describe('Activity feed (DOW-37)', () => {
     expect(await screen.findByText('Solara · Command Race: founded Karak')).toBeTruthy();
     expect(cards()).toHaveLength(actions.length);
     const text = (i: number) => cards()[i].props.children.join('');
-    expect(text(0)).toContain('Command Avatar: Durin, a mortal deed');
+    expect(text(0)).toContain('Command Race: Host of Karak took Underhold');
+    // DOW-55: the battle, die by die.
+    expect(
+      screen.getByText(/Won against Pale Guard: 5 \+ 4 \+ 1 = 10 vs 2 \+ 2 \+ 1 = 5/),
+    ).toBeTruthy();
+    expect(screen.getByText('Underhold lies in ruins.')).toBeTruthy();
     expect(text(feedIndex(karakAction.seq))).toContain('founded Karak');
     expect(text(feedIndex(raceAction.seq))).toContain('Create Race: Dwarves');
     expect(feedIndex(karakAction.seq)).toBeLessThan(feedIndex(raceAction.seq));
@@ -249,10 +254,11 @@ describe('History Chart (DOW-36)', () => {
     await render(<ChronicleScreen />);
     await screen.findByText(`${actions.length} entries`);
     await fireEvent.press(screen.getByLabelText('Dwarves'));
-    // With Karak, its subrace, advancement, order and avatar.
-    expect(screen.getByText('9 entries')).toBeTruthy();
+    // With Karak, its subrace, advancement, order, avatar, wall, army, march and battle.
+    expect(screen.getByText('13 entries')).toBeTruthy();
     await fireEvent.press(screen.getByLabelText('Karak (city)'));
-    expect(screen.getByText('2 entries')).toBeTruthy(); // founded, then purified
+    // Founded, purified, built a wall, raised the Host, which marched and took Underhold.
+    expect(screen.getByText('6 entries')).toBeTruthy();
     await fireEvent.press(screen.getByLabelText('Everything'));
 
     const solaraActions = actions.filter((a) => a.godId === dwarves.godId).length;

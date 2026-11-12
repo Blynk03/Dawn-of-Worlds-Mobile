@@ -47,7 +47,8 @@ describe('subraceCandidates (DOW-43)', () => {
   });
 
   it('works for subraces of subraces, and nothing for unknown races', () => {
-    expect(sites(deep.id)).toContainEqual([7, 4]);
+    expect(sites(deep.id)).toContainEqual([8, 4]); // next to its city, Underhold
+    expect(sites(deep.id)).not.toContainEqual([7, 4]); // Underhold itself
     expect(sites('nope')).toEqual([]);
   });
 });

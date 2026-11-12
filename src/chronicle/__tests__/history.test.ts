@@ -109,6 +109,46 @@ describe('History Chart (DOW-36)', () => {
     ).toBe('Durin returns');
   });
 
+  it('describes cities, armies and battles (DOW-48/55/41)', () => {
+    const ofIntent = (intent: string) => view.actions.find((a) => a.intent === intent)!;
+    expect(describeAction(ofIntent('build'))).toEqual({
+      power: 'Command City',
+      what: 'Karak builds The Iron Wall',
+    });
+    expect(describeAction(ofIntent('raiseArmy')).what).toBe('Karak raises Host of Karak');
+    expect(describeAction(ofIntent('march')).what).toBe('Host of Karak marched to (6, 5)');
+    const attack = ofIntent('attack');
+    expect(describeAction(attack)).toEqual({
+      power: 'Command Race',
+      what: 'Host of Karak took Underhold',
+    });
+    const battle = attack.battle!;
+    expect(
+      describeAction({ ...attack, battle: { ...battle, cityOutcome: 'destroyed' } }).what,
+    ).toBe('Host of Karak razed Underhold');
+    expect(describeAction({ ...attack, battle: { ...battle, outcome: 'lost' } }).what).toBe(
+      'Host of Karak fell attacking Underhold',
+    );
+    const onArmy = { ...attack, target: { ...attack.target!, kind: 'army' as const } };
+    expect(describeAction({ ...onArmy, choice: 'Pale Guard' }).what).toBe(
+      'Host of Karak scattered Pale Guard',
+    );
+    expect(
+      describeAction({
+        ...onArmy,
+        choice: 'Pale Guard',
+        battle: { ...battle, cityOutcome: null, destructionCost: 4 },
+      }).what,
+    ).toBe('Host of Karak destroyed Pale Guard');
+    // Through an avatar.
+    const deed = view.actions.find((a) => a.power === 'commandAvatar')!;
+    const raise = ofIntent('raiseArmy');
+    expect(
+      describeAction({ ...deed, intent: 'raiseArmy', target: raise.target, choice: 'Wardens' })
+        .what,
+    ).toBe('Durin bids Karak raise Wardens');
+  });
+
   it('knows which races and cities an action involves', () => {
     expect(actionEntities(view, byPower('shapeLand'))).toEqual([]);
     expect(actionEntities(view, byPower('createRace'))).toEqual([
@@ -155,11 +195,24 @@ describe('History Chart (DOW-36)', () => {
       'commandOrder',
       'createAvatar',
       'commandAvatar',
+      'commandCity', // the Iron Wall
+      'commandCity', // the Host of Karak
+      'commandRace', // its march
+      'commandRace', // its attack on Underhold
     ]);
     expect(historyRows(view, { entityId: karak.id }).map((r) => r.power)).toEqual([
       'commandRace',
       'purifyCity',
+      'commandCity',
+      'commandCity',
+      'commandRace',
+      'commandRace',
     ]);
+    // An attack is in the history of both sides.
+    const underhold = view.cities.find((c) => c.name === 'Underhold')!;
+    expect(
+      historyRows(view, { entityId: underhold.id }).map((r) => describeAction(r).what),
+    ).toEqual(['founded Underhold', 'Underhold raises Pale Guard', 'Host of Karak took Underhold']);
     expect(historyRows(view, { entityId: dwarves.id, godId: 'nobody' })).toEqual([]);
   });
 
@@ -168,6 +221,7 @@ describe('History Chart (DOW-36)', () => {
       { id: dwarves.id, kind: 'race', name: 'Dwarves' },
       { id: karak.id, kind: 'city', name: 'Karak' },
       { id: view.races[1].id, kind: 'race', name: 'Deep Dwarves' },
+      { id: view.cities[1].id, kind: 'city', name: 'Underhold' },
     ]);
   });
 });

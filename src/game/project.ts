@@ -63,6 +63,8 @@ export type ActionRecord = HexChange & {
   intent: string | null;
   /** What an action was aimed at (Advance, Purify, Corrupt). `key` is the id, or "x,y" for a region. */
   target: ActionTarget | null;
+  /** For an attack: the battles and their outcome. */
+  battle: BattleView | null;
   /** For Command Avatar: the avatar that acted. */
   avatar: { id: string; name: string } | null;
   /** For Purify / Corrupt: the target's alignment afterwards. */
@@ -74,7 +76,7 @@ export type ActionRecord = HexChange & {
 };
 
 export type ActionTarget = {
-  kind: 'race' | 'city' | 'region' | 'order' | 'avatar';
+  kind: 'race' | 'city' | 'region' | 'order' | 'avatar' | 'army';
   id: string | null;
   key: string;
   name: string;
@@ -105,6 +107,55 @@ export type CityView = Origin & {
   hex: { x: number; y: number };
   /** What happened when it was founded. */
   description: string;
+  /** DOW-41: 'ruined' when taken in battle (survivors remain), 'destroyed' if utterly wiped out. */
+  status: 'active' | 'ruined' | 'destroyed';
+};
+
+/** DOW-48: an army raised by a city. */
+export type ArmyView = Origin & {
+  id: string;
+  name: string;
+  raceId: string;
+  cityId: string;
+  hex: { x: number; y: number };
+  description: string;
+  /** 'scattered' when beaten (survivors remain), 'destroyed' if utterly wiped out. */
+  status: 'active' | 'scattered' | 'destroyed';
+};
+
+/** DOW-48: a wonder, wall, school, tower… built by a city. */
+export type StructureView = Origin & {
+  id: string;
+  name: string;
+  structureType: 'wonder' | 'wall' | 'school' | 'tower' | 'temple' | 'other';
+  cityId: string;
+  description: string;
+};
+
+/** One battle within an attack: 2d6 + bonuses each side; the attacker tires after the first. */
+export type BattleRound = {
+  defenderId: string;
+  defenderName: string;
+  attackerDice: number[];
+  defenderDice: number[];
+  attackerBonus: number;
+  defenderBonus: number;
+  fatigue: number;
+  attackerTotal: number;
+  defenderTotal: number;
+  winner: 'attacker' | 'defender';
+};
+
+/** DOW-54/55: an attack and how it went. */
+export type BattleView = {
+  armyId: string;
+  armyName: string;
+  attackerModifiers: string[];
+  defenderModifiers: string[];
+  battles: BattleRound[];
+  outcome: 'won' | 'lost';
+  cityOutcome: 'ruined' | 'destroyed' | null;
+  destructionCost: number;
 };
 
 /** DOW-47: a race or city that is the greatest in the world at a field. */
@@ -163,6 +214,8 @@ export type GameView = {
   cities: CityView[];
   orders: OrderView[];
   avatars: AvatarView[];
+  armies: ArmyView[];
+  structures: StructureView[];
   advancements: AdvancementView[];
   /** seq of the current round's round_started event. */
   roundStartSeq: number;
@@ -190,6 +243,8 @@ export const EMPTY_GAME: GameView = {
   orders: [],
   advancements: [],
   avatars: [],
+  armies: [],
+  structures: [],
   roundStartSeq: 0,
   lastSeq: 0,
 };
@@ -320,6 +375,7 @@ export function applyEvent(view: GameView, event: GameEvent): GameView {
         cost: num(p.cost),
         hexes,
         intent: str(p.intent),
+        battle: battleOf(p.battle),
         avatar: (() => {
           const a = asObj(p.avatar);
           const id = str(a.id);
@@ -388,8 +444,73 @@ export function applyEvent(view: GameView, event: GameEvent): GameView {
             alignment: num(city.alignment),
             hex: hexOf(city.hex),
             description: action.description,
+            status: 'active',
           },
         ];
+      }
+      const army = asObj(p.army);
+      const armyId = str(army.id);
+      const armyRace = str(army.race_id);
+      const armyCity = str(army.city_id);
+      if (armyId && armyRace && armyCity) {
+        next.armies = [
+          ...view.armies,
+          {
+            ...origin,
+            id: armyId,
+            name: str(army.name) ?? action.choice,
+            raceId: armyRace,
+            cityId: armyCity,
+            hex: hexOf(army.hex),
+            description: action.description,
+            status: 'active',
+          },
+        ];
+      }
+      const structure = asObj(p.structure);
+      const structureId = str(structure.id);
+      const structureCity = str(structure.city_id);
+      if (structureId && structureCity) {
+        next.structures = [
+          ...view.structures,
+          {
+            ...origin,
+            id: structureId,
+            name: str(structure.name) ?? action.choice,
+            structureType: structureTypeOf(structure.structure_type),
+            cityId: structureCity,
+            description: action.description,
+          },
+        ];
+      }
+      // Marching moves an army.
+      const march = asObj(p.march);
+      const marching = str(march.army_id);
+      if (marching) {
+        const to = hexOf(march.to);
+        next.armies = next.armies.map((a) => (a.id === marching ? { ...a, hex: to } : a));
+      }
+      // A battle: the losers are scattered or destroyed, a taken city ruined or destroyed, and the
+      // victors hold the field.
+      const battle = action.battle;
+      if (battle) {
+        const b = asObj(p.battle);
+        const scattered = new Set(stringList(b.scattered));
+        const destroyed = new Set(stringList(b.destroyed));
+        const field = action.hexes[0];
+        next.armies = next.armies.map((a) => {
+          if (destroyed.has(a.id)) return { ...a, status: 'destroyed' };
+          if (scattered.has(a.id)) return { ...a, status: 'scattered' };
+          if (a.id === battle.armyId && battle.outcome === 'won' && field) {
+            return { ...a, hex: { x: field[0], y: field[1] } };
+          }
+          return a;
+        });
+        const cityId = action.target?.kind === 'city' ? action.target.id : null;
+        const fallen = battle.cityOutcome;
+        if (cityId && fallen) {
+          next.cities = next.cities.map((c) => (c.id === cityId ? { ...c, status: fallen } : c));
+        }
       }
       const avatar = asObj(p.avatar);
       const avatarId = str(avatar.id);
@@ -495,12 +616,66 @@ function targetOf(v: unknown): ActionTarget | null {
       kind !== 'city' &&
       kind !== 'region' &&
       kind !== 'order' &&
-      kind !== 'avatar') ||
+      kind !== 'avatar' &&
+      kind !== 'army') ||
     !key
   ) {
     return null;
   }
   return { kind, id: str(t.id), key, name: str(t.name) ?? '' };
+}
+
+function stringList(v: unknown): string[] {
+  return Array.isArray(v) ? v.map((x) => String(x)) : [];
+}
+
+const STRUCTURE_TYPES: StructureView['structureType'][] = [
+  'wonder',
+  'wall',
+  'school',
+  'tower',
+  'temple',
+  'other',
+];
+
+function structureTypeOf(v: unknown): StructureView['structureType'] {
+  return STRUCTURE_TYPES.includes(v as StructureView['structureType'])
+    ? (v as StructureView['structureType'])
+    : 'other';
+}
+
+function battleOf(v: unknown): BattleView | null {
+  const b = asObj(v);
+  const army = asObj(b.army);
+  const armyId = str(army.id);
+  if (!armyId) return null;
+  const rounds = Array.isArray(b.battles) ? b.battles : [];
+  return {
+    armyId,
+    armyName: str(army.name) ?? '',
+    attackerModifiers: stringList(b.attacker_modifiers),
+    defenderModifiers: stringList(b.defender_modifiers),
+    battles: rounds.map((r): BattleRound => {
+      const round = asObj(r);
+      const defender = asObj(round.defender);
+      return {
+        defenderId: str(defender.id) ?? '',
+        defenderName: str(defender.name) ?? '',
+        attackerDice: Array.isArray(round.attacker_dice) ? round.attacker_dice.map(num) : [],
+        defenderDice: Array.isArray(round.defender_dice) ? round.defender_dice.map(num) : [],
+        attackerBonus: num(round.attacker_bonus),
+        defenderBonus: num(round.defender_bonus),
+        fatigue: num(round.fatigue),
+        attackerTotal: num(round.attacker_total),
+        defenderTotal: num(round.defender_total),
+        winner: round.winner === 'attacker' ? 'attacker' : 'defender',
+      };
+    }),
+    outcome: b.outcome === 'won' ? 'won' : 'lost',
+    cityOutcome:
+      b.city_outcome === 'ruined' || b.city_outcome === 'destroyed' ? b.city_outcome : null,
+    destructionCost: num(b.destruction_cost),
+  };
 }
 
 const ORDER_TYPES: OrderType[] = [
