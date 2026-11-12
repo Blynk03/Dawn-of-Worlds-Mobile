@@ -1,10 +1,17 @@
 // DOW-52/53: reading votes and objections out of the projected game.
 import type { ActionRecord, GameView, ProposalView } from './project';
 
-export type VoteCounts = { yes: number; no: number; keep: number; undo: number; coin: number };
+export type VoteCounts = {
+  yes: number;
+  no: number;
+  keep: number;
+  undo: number;
+  coin: number;
+  drop: number;
+};
 
 export function voteCounts(proposal: ProposalView): VoteCounts {
-  const counts: VoteCounts = { yes: 0, no: 0, keep: 0, undo: 0, coin: 0 };
+  const counts: VoteCounts = { yes: 0, no: 0, keep: 0, undo: 0, coin: 0, drop: 0 };
   for (const choice of Object.values(proposal.votes)) {
     if (choice in counts) counts[choice as keyof VoteCounts] += 1;
   }

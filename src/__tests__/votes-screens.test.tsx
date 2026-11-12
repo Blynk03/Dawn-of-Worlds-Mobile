@@ -32,6 +32,8 @@ const now = new Date('2026-11-04T01:00:00Z');
 const ageVote = (votes: Record<string, string>): ProposalView => ({
   id: 'p-age',
   kind: 'advanceAge',
+  battleId: null,
+  bonusId: null,
   godId: g2,
   targetSeq: null,
   age: 2,
@@ -234,5 +236,76 @@ describe('Objecting from the feed (DOW-53)', () => {
     expect(
       screen.getByText(/Undone along with “Hills”, which it built on; its cost was refunded\./),
     ).toBeTruthy();
+  });
+});
+
+describe('A declared battle (DOW-56/54)', () => {
+  // The fixture's Host of Karak has declared war on Karak; the other god added Higher ground for
+  // the defenders and disputed the attacker's Steel.
+  const declared = { ...base.battles[0], closesAt: '2026-11-04T12:00:00Z' };
+  const attacker = declared.godId!;
+  const other = base.turnOrder.find((g) => g !== attacker)!;
+  const dispute = base.proposals.find((p) => p.kind === 'bonus')!;
+  const view = { ...base, battles: [declared] };
+
+  beforeEach(() => {
+    api.proposeBonus.mockResolvedValue();
+    api.disputeBonus.mockResolvedValue();
+    api.waiveReaction.mockResolvedValue('pending');
+    api.closeBattle.mockResolvedValue('won');
+  });
+
+  it('shows the battle, its bonuses and when it is rolled', async () => {
+    await show(view, other);
+    expect(screen.getByText('⚔︎ Host of Karak marches on Karak')).toBeTruthy();
+    expect(screen.getByText(/Rolled in 11h, or as soon as every other god waives/)).toBeTruthy();
+    // Steel is disputed, so it doesn't count until it's kept.
+    expect(screen.getByText('Host of Karak’s bonuses: 2d6 + 0')).toBeTruthy();
+    expect(screen.getByText(/\+1 Steel · .* · disputed/)).toBeTruthy();
+    expect(screen.getByText('Karak’s bonuses: 2d6 + 2')).toBeTruthy();
+    expect(screen.getByText('Waived: 0 of 2')).toBeTruthy();
+  });
+
+  it('takes votes on a disputed bonus, and disputes others', async () => {
+    await show(view, attacker);
+    await fireEvent.press(screen.getByLabelText('Count it'));
+    expect(api.castVote).toHaveBeenCalledWith('w1', dispute.id, 'keep');
+    // Higher ground was proposed by the other god: the attacker can dispute it.
+    await fireEvent.press(screen.getByLabelText('Dispute Higher ground'));
+    expect(api.disputeBonus).toHaveBeenCalledWith('w1', declared.bonuses[2].id);
+    // ...but not their own Iron Wall.
+    expect(screen.queryByLabelText('Dispute The Iron Wall')).toBeNull();
+  });
+
+  it('lets any god propose a bonus for either side', async () => {
+    await show(view, other);
+    await fireEvent.changeText(
+      screen.getByLabelText('Propose a bonus for the attackers'),
+      'Night march',
+    );
+    await fireEvent.press(screen.getAllByRole('button', { name: 'Add' })[0]);
+    expect(api.proposeBonus).toHaveBeenCalledWith('w1', declared.id, 'attacker', 'Night march');
+  });
+
+  it('lets the other gods waive, not the attacker', async () => {
+    await show(view, attacker);
+    expect(screen.queryByRole('button', { name: /Waive/ })).toBeNull();
+    await show(view, other);
+    await fireEvent.press(screen.getByRole('button', { name: 'Waive: roll it without me' }));
+    expect(api.waiveReaction).toHaveBeenCalledWith('w1', declared.id);
+    await show({ ...view, battles: [{ ...declared, waived: [other] }] }, other);
+    expect(screen.queryByRole('button', { name: /Waive/ })).toBeNull();
+    expect(screen.getByText(/Waived: 1 of 2/)).toBeTruthy();
+  });
+
+  it('rolls it when the window has closed', async () => {
+    await show({ ...view, battles: [{ ...declared, closesAt: '2026-11-04T00:30:00Z' }] });
+    expect(screen.getByText(/Rolling now…/)).toBeTruthy();
+    expect(api.closeBattle).toHaveBeenCalledWith('w1', declared.id);
+  });
+
+  it('shows nothing once it has been fought', async () => {
+    await show({ ...view, battles: [{ ...declared, status: 'resolved', outcome: 'won' }] });
+    expect(screen.queryByText(/marches on Karak/)).toBeNull();
   });
 });

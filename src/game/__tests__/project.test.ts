@@ -81,10 +81,81 @@ describe('projectWorld against a game played by the server', () => {
     expect(view.hexHistory[7 * view.map!.width] ?? []).not.toContain(hill.seq);
   });
 
+  it('follows a declared battle, its bonuses and the dispute (DOW-56/54)', () => {
+    expect(view.battles).toHaveLength(1);
+    const [battle] = view.battles;
+    const host = view.armies.find((a) => a.name === 'Host of Karak')!;
+    const karak = view.cities.find((c) => c.name === 'Karak')!;
+    expect(battle).toMatchObject({
+      army: { id: host.id, name: 'Host of Karak' },
+      target: { kind: 'city', id: karak.id, name: 'Karak' },
+      utterlyDestroy: false,
+      description: 'The Host turns on its own city',
+      cost: 8,
+      reserved: 0,
+      status: 'pending',
+      waived: [],
+    });
+    expect(battle.closesAt).toEqual(expect.any(String));
+    expect(battle.bonuses.map((b) => [b.side, b.label, b.status])).toEqual([
+      ['attacker', 'Steel', 'disputed'],
+      ['defender', 'The Iron Wall', 'agreed'],
+      ['defender', 'Higher ground', 'agreed'],
+    ]);
+    expect(battle.bonuses[2].godId).not.toBe(battle.godId);
+    const dispute = view.proposals.find((p) => p.kind === 'bonus')!;
+    expect(dispute).toMatchObject({
+      battleId: battle.id,
+      bonusId: battle.bonuses[0].id,
+      reason: 'Steel',
+      status: 'open',
+      votes: { [dispute.godId!]: 'drop' },
+    });
+    // Nothing is rolled yet: the Host and Karak stand.
+    expect(host.status).toBe('active');
+    expect(karak.status).toBe('active');
+  });
+
+  it('records a battle rolled or called off, and a kept or dropped bonus', () => {
+    const [battle] = view.battles;
+    const dispute = view.proposals.find((p) => p.kind === 'bonus')!;
+    let seq = view.lastSeq;
+    const ev = (type: string, payload: Record<string, unknown>): GameEvent => ({
+      seq: ++seq,
+      type,
+      age: 1,
+      round: view.round,
+      god_id: battle.godId,
+      payload,
+      created_at: '2026-11-04T06:00:00Z',
+    });
+    const after = projectWorld(
+      [
+        ev('reaction_waived', { battle_id: battle.id }),
+        ev('proposal_resolved', { proposal_id: dispute.id, kind: 'bonus', outcome: 'dropped' }),
+        ev('battle_cancelled', {
+          battle_id: battle.id,
+          reason: 'Karak is gone',
+          refund: 8,
+          power_after: 40,
+        }),
+      ],
+      view,
+    );
+    expect(after.battles[0]).toMatchObject({
+      status: 'cancelled',
+      reason: 'Karak is gone',
+      waived: [battle.godId],
+    });
+    expect(after.battles[0].bonuses[0].status).toBe('dropped');
+    expect(after.powers[battle.godId!].power).toBe(40);
+  });
+
   it('records the objection and its vote (DOW-53)', () => {
     const hill = view.actions[view.actions.length - 1];
-    expect(view.proposals).toHaveLength(1);
-    const [objection] = view.proposals;
+    const objections = view.proposals.filter((p) => p.kind === 'objection');
+    expect(objections).toHaveLength(1);
+    const [objection] = objections;
     expect(objection).toMatchObject({
       kind: 'objection',
       targetSeq: hill.seq,
@@ -434,7 +505,7 @@ describe('applying events incrementally', () => {
       ],
       base,
     );
-    expect(voting.proposals[1]).toMatchObject({
+    expect(voting.proposals.find((x) => x.id === 'p1')).toMatchObject({
       kind: 'advanceAge',
       age: 2,
       status: 'open',
@@ -451,7 +522,7 @@ describe('applying events incrementally', () => {
       ],
       voting,
     );
-    expect(passed.proposals[1].status).toBe('passed');
+    expect(passed.proposals.find((x) => x.id === 'p1')!.status).toBe('passed');
     expect(passed.agePending).toBe(true);
     const next = projectWorld(
       [ev('age_advanced', null, { age: 2, name: 'Second Age', years_per_round: 100, round: 9 })],

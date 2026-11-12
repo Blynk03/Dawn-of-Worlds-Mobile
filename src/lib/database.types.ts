@@ -43,6 +43,7 @@ export type Database = {
           /** Hours a turn can wait before its player is reminded (0 = never). */
           reminder_hours: number;
           objection_hours: number;
+          reaction_hours: number;
           created_by: string;
           created_at: string;
           updated_at: string;
@@ -56,6 +57,7 @@ export type Database = {
           turn_time_limit_hours?: number | null;
           reminder_hours?: number;
           objection_hours?: number;
+          reaction_hours?: number;
           created_by?: string;
           created_at?: string;
           updated_at?: string;
@@ -65,6 +67,7 @@ export type Database = {
           turn_time_limit_hours?: number | null;
           reminder_hours?: number;
           objection_hours?: number;
+          reaction_hours?: number;
         };
         Relationships: [
           {
@@ -352,6 +355,26 @@ export type Database = {
         Returns: string | null;
       };
       delete_my_account: { Args: Record<string, never>; Returns: undefined };
+      declare_attack: {
+        Args: {
+          target_world: string;
+          army: string;
+          target_kind: string;
+          target: string;
+          attacker_modifiers: Json;
+          defender_modifiers: Json;
+          utterly_destroy: boolean;
+          description: string;
+        };
+        Returns: string;
+      };
+      propose_bonus: {
+        Args: { target_world: string; battle: string; side: string; label: string };
+        Returns: string;
+      };
+      dispute_bonus: { Args: { target_world: string; bonus: string }; Returns: string };
+      waive_reaction: { Args: { target_world: string; battle: string }; Returns: string };
+      close_battle: { Args: { target_world: string; battle: string }; Returns: string };
       propose_next_age: { Args: { target_world: string }; Returns: string };
       object_to_action: {
         Args: { target_world: string; action_seq: number; reason: string };

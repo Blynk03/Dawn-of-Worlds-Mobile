@@ -177,6 +177,20 @@ select set_config('fx.objection', public.object_to_action('11111111-1111-1111-11
   current_setting('fx.hill')::int, 'That hill is in my sea')::text, false);
 select pg_temp.act_as(current_setting('fx.actor_user')::uuid);
 select public.vote('11111111-1111-1111-1111-111111111111', current_setting('fx.objection')::uuid, 'undo');
+-- DOW-56/54: an attack declared on Karak, waiting out its reaction window; the other god adds a
+-- bonus for the defenders and disputes one of the attacker's.
+select public.declare_attack('11111111-1111-1111-1111-111111111111',
+  (select id from public.world_entities where name = 'Host of Karak'), 'city',
+  (select id from public.world_entities where name = 'Karak'),
+  '["Steel"]', '["The Iron Wall"]', false, 'The Host turns on its own city');
+select set_config('fx.battle', (select id::text from public.world_battles
+  where world_id = '11111111-1111-1111-1111-111111111111'), false);
+select pg_temp.act_as(current_setting('fx.other_user')::uuid);
+select public.propose_bonus('11111111-1111-1111-1111-111111111111', current_setting('fx.battle')::uuid,
+  'defender', 'Higher ground');
+select public.dispute_bonus('11111111-1111-1111-1111-111111111111',
+  (select id from public.world_battle_bonuses where label = 'Steel'));
+select pg_temp.act_as(current_setting('fx.actor_user')::uuid);
 select pg_temp.play('11111111-1111-1111-1111-111111111111', false, false);
 reset role;
 update public.world_state set turn_deadline = now() - interval '1 minute'

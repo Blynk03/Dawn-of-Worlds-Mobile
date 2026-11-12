@@ -405,7 +405,7 @@ export async function objectToAction(
   return data;
 }
 
-export type VoteChoice = 'yes' | 'no' | 'keep' | 'undo' | 'coin';
+export type VoteChoice = 'yes' | 'no' | 'keep' | 'undo' | 'coin' | 'drop';
 
 /** Votes (or changes your vote). Returns the vote's status afterwards. */
 export async function castVote(
@@ -439,6 +439,81 @@ export async function setObjectionHours(worldId: string, hours: number): Promise
   const { error } = await client()
     .from('worlds')
     .update({ objection_hours: hours })
+    .eq('id', worldId);
+  if (error) throw new Error(friendlyError(error));
+}
+
+/**
+ * DOW-56: declares an attack. In worlds with a reaction window it returns 'pending' and the
+ * battle is rolled when the window closes (or everyone waives); otherwise 'won' or 'lost'.
+ */
+export async function declareAttack(
+  worldId: string,
+  order: AttackOrder,
+): Promise<'pending' | 'won' | 'lost'> {
+  const { data, error } = await client().rpc('declare_attack', {
+    target_world: worldId,
+    army: order.armyId,
+    target_kind: order.target.kind,
+    target: order.target.id,
+    attacker_modifiers: order.attackerModifiers,
+    defender_modifiers: order.defenderModifiers,
+    utterly_destroy: order.utterlyDestroy,
+    description: order.description,
+  });
+  if (error) throw new Error(friendlyError(error));
+  return data === 'won' || data === 'lost' ? data : 'pending';
+}
+
+/** DOW-54: proposes a +1 for one side of a declared battle. */
+export async function proposeBonus(
+  worldId: string,
+  battleId: string,
+  side: 'attacker' | 'defender',
+  label: string,
+): Promise<void> {
+  const { error } = await client().rpc('propose_bonus', {
+    target_world: worldId,
+    battle: battleId,
+    side,
+    label,
+  });
+  if (error) throw new Error(friendlyError(error));
+}
+
+/** DOW-54: disputes someone else's bonus, putting it to a vote. */
+export async function disputeBonus(worldId: string, bonusId: string): Promise<void> {
+  const { error } = await client().rpc('dispute_bonus', { target_world: worldId, bonus: bonusId });
+  if (error) throw new Error(friendlyError(error));
+}
+
+/** DOW-56: waives your chance to respond; once everyone has, the battle is rolled. */
+export async function waiveReaction(worldId: string, battleId: string): Promise<string> {
+  const { data, error } = await client().rpc('waive_reaction', {
+    target_world: worldId,
+    battle: battleId,
+  });
+  if (error) throw new Error(friendlyError(error));
+  return data;
+}
+
+/** Rolls a battle whose window has closed (anyone in the world can). */
+export async function closeBattle(worldId: string, battleId: string): Promise<string> {
+  const { data, error } = await client().rpc('close_battle', {
+    target_world: worldId,
+    battle: battleId,
+  });
+  if (error) throw new Error(friendlyError(error));
+  return data;
+}
+
+/** The host's setting: hours other gods have to respond before a battle is rolled (0 = at once). */
+export const REACTION_OPTIONS = [0, 1, 6, 12, 24, 48] as const;
+
+export async function setReactionHours(worldId: string, hours: number): Promise<void> {
+  const { error } = await client()
+    .from('worlds')
+    .update({ reaction_hours: hours })
     .eq('id', worldId);
   if (error) throw new Error(friendlyError(error));
 }
