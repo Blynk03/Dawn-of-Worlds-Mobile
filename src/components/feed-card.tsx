@@ -15,7 +15,7 @@ import { Card, ErrorMessage, GodBadge } from '@/components/game-ui';
 import { MapThumbnail } from '@/components/map-thumbnail';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
-import { objectToAction } from '@/game/api';
+import { gmRuleNontraditional, objectToAction } from '@/game/api';
 import { type ActionRecord, ageName, describeDeadline, type GameView } from '@/game/project';
 import { canObject, objectionDeadline, objectionTo, voteCounts } from '@/game/votes';
 import { useTheme } from '@/hooks/use-theme';
@@ -134,6 +134,15 @@ export function FeedCard({
           <ThemedText themeColor={action.retconned ? 'textSecondary' : undefined}>
             {action.description}
           </ThemedText>
+          <NontraditionalRuling
+            worldId={worldId}
+            action={action}
+            view={view}
+            isGm={members.some((m) => m.user_id === myId && m.is_gm)}
+            hours={objectionHours}
+            now={now}
+            onChanged={onChanged}
+          />
           <ObjectionStatus
             worldId={worldId}
             action={action}
@@ -258,6 +267,76 @@ function TextLink({
 }
 
 /**
+ * DOW-62: the GM can rule a new race non-traditional, so its creator pays double (or it's undone
+ * if they can't), within the objection window (or a day, if objections are off).
+ */
+function NontraditionalRuling({
+  worldId,
+  action,
+  view,
+  isGm,
+  hours,
+  now,
+  onChanged,
+}: {
+  worldId: string;
+  action: ActionRecord;
+  view: GameView;
+  isGm: boolean;
+  hours: number;
+  now: Date;
+  onChanged: () => void;
+}) {
+  const [confirming, setConfirming] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  if (action.power !== 'createRace') return null;
+  const ruling = view.gmRulings.find(
+    (r) => r.kind === 'nontraditional' && r.targetSeq === action.seq,
+  );
+  if (ruling) {
+    return (
+      <ThemedText type="small" themeColor="accent">
+        {ruling.charged > 0
+          ? `The GM ruled this race non-traditional: it cost double (+${ruling.charged}).`
+          : 'The GM ruled this race non-traditional, and its creator couldn’t pay double.'}
+        {ruling.note ? ` “${ruling.note}”` : ''}
+      </ThemedText>
+    );
+  }
+  const deadline = objectionDeadline(action, hours > 0 ? hours : 24);
+  if (!isGm || action.retconned || !deadline || deadline <= now) return null;
+  const rule = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await gmRuleNontraditional(worldId, action.seq);
+      setConfirming(false);
+      onChanged();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return confirming ? (
+    <View style={styles.objection}>
+      <ThemedText type="small">
+        Rule the {action.choice} non-traditional? Their creator pays the cost again ({action.cost}
+        ); if they can’t, the race is undone and refunded.
+      </ThemedText>
+      <View style={styles.row}>
+        <Button title="Rule it non-traditional" onPress={rule} busy={busy} />
+        <Button title="Cancel" variant="secondary" onPress={() => setConfirming(false)} />
+      </View>
+      <ErrorMessage message={error} />
+    </View>
+  ) : (
+    <TextLink label="GM: non-traditional (costs double)" onPress={() => setConfirming(true)} />
+  );
+}
+
+/**
  * DOW-53: whether an action was undone, the objection to it and how the vote went, or (for the
  * other gods, inside the objection window) a way to object.
  */
@@ -298,8 +377,12 @@ function ObjectionStatus({
   }
   if (objection) {
     const counts = voteCounts(objection);
-    const result =
-      objection.status === 'open'
+    const ruling = view.gmRulings.find((r) => r.proposalId === objection.id);
+    const result = objection.byGm
+      ? `${objection.status === 'undone' ? 'Undone' : 'Kept'} by the GM’s ruling${
+          ruling?.note ? `: “${ruling.note}”` : ''
+        }${objection.status === 'undone' ? '; its cost was refunded.' : '.'}`
+      : objection.status === 'open'
         ? 'The gods are voting: vote on the world screen.'
         : objection.status === 'undone'
           ? `Undone${objection.coin ? ' on a coin flip' : ` by vote (${counts.undo} to ${counts.keep})`}; its cost was refunded.`

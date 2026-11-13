@@ -20,6 +20,8 @@ type Props = {
   myId: string;
   /** Opens the action screen. Without it, the Act button is hidden. */
   onAct?: () => void;
+  /** DOW-62: the GM has the final say on objections and disputed bonuses. */
+  gmFinalSay?: boolean;
 };
 
 export type GameState = ReturnType<typeof useGame>;
@@ -37,6 +39,7 @@ export function GamePanelView({
   members,
   myId,
   onAct,
+  gmFinalSay = false,
   game,
 }: Props & { game: GameState }) {
   const { view, error, loaded, refresh } = game;
@@ -144,6 +147,10 @@ export function GamePanelView({
         view={view}
         gods={gods}
         myGodId={myGod?.id ?? null}
+        gm={{
+          isMe: members.some((m) => m.user_id === myId && m.is_gm),
+          finalSay: gmFinalSay,
+        }}
         now={now}
         onChanged={refresh}
       />

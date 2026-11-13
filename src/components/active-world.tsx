@@ -25,6 +25,8 @@ type Props = {
   myId: string;
   /** "x,y": a hex to show and open, e.g. from a chronicle link. */
   focusHex?: string;
+  /** DOW-62: the GM has the final say on objections and disputed bonuses. */
+  gmFinalSay?: boolean;
 };
 
 function parseHex(value: string | undefined): Hex | null {
@@ -36,7 +38,7 @@ function parseHex(value: string | undefined): Hex | null {
  * A world in play: the map (tap or long-press a hex for its story) and the game panel.
  * Tablets: map and panel side by side. Phones: map on top, panel below.
  */
-export function ActiveWorld({ worldId, gods, members, myId, focusHex }: Props) {
+export function ActiveWorld({ worldId, gods, members, myId, focusHex, gmFinalSay }: Props) {
   const router = useRouter();
   const game = useGame(worldId, true);
   const mode = useLayoutMode();
@@ -93,6 +95,7 @@ export function ActiveWorld({ worldId, gods, members, myId, focusHex }: Props) {
         gods={gods}
         members={members}
         myId={myId}
+        gmFinalSay={gmFinalSay}
         game={game}
         onAct={map ? () => router.push(`/world/${worldId}/act`) : undefined}
       />

@@ -28,6 +28,7 @@ jest.mock('@/game/api', () => ({
   REACTION_OPTIONS: [0, 1, 6, 12, 24, 48],
   setObjectionHours: jest.fn(),
   setReactionHours: jest.fn(),
+  gmSetRules: jest.fn(),
 }));
 jest.mock('@/notifications/api', () => ({
   ...jest.requireActual('@/notifications/api'),
@@ -61,6 +62,9 @@ const world: World = {
   reminder_hours: 24,
   objection_hours: 12,
   reaction_hours: 12,
+  gm_final_say: false,
+  alignment_cap: null,
+  years_per_round: null,
   created_by: 'u-host',
   created_at: '',
   updated_at: '',
@@ -186,5 +190,69 @@ describe('Tapping a notification', () => {
     notifications.useLastNotificationResponse.mockReturnValue(null);
     await render(<PushHandler userId="u-host" />);
     expect(mockRouter.push).not.toHaveBeenCalled();
+  });
+});
+
+describe('The GM’s rules (DOW-62)', () => {
+  const gmLobby = (gmUser: string, extra: Partial<World> = {}) =>
+    worlds.getLobby.mockResolvedValue({
+      world: { ...world, ...extra },
+      members: [
+        { ...member('u-host', 'host'), is_gm: gmUser === 'u-host' },
+        member('u-bob', 'player'),
+      ],
+      gods: [],
+      map: null,
+    });
+
+  it('says when a world has no GM', async () => {
+    await render(<WorldSettingsScreen />);
+    expect(await screen.findByText(/This world has no GM/)).toBeTruthy();
+  });
+
+  it('lets the GM give themselves the final say and cap alignment', async () => {
+    gmLobby('u-host');
+    await render(<WorldSettingsScreen />);
+    expect(await screen.findByText(/You are the GM/)).toBeTruthy();
+    await fireEvent.press(screen.getByLabelText('The GM rules'));
+    expect(jest.mocked(gameApi).gmSetRules).toHaveBeenCalledWith('w1', {
+      finalSay: true,
+      alignmentCap: null,
+      yearsPerRound: null,
+    });
+    await fireEvent.press(screen.getByLabelText('Capped at ±5'));
+    expect(jest.mocked(gameApi).gmSetRules).toHaveBeenLastCalledWith('w1', {
+      finalSay: false,
+      alignmentCap: 5,
+      yearsPerRound: null,
+    });
+  });
+
+  it('lets the GM change the years per round', async () => {
+    gmLobby('u-host');
+    await render(<WorldSettingsScreen />);
+    const saveYears = await screen.findByRole('button', { name: 'Save years' });
+    expect(saveYears).toBeDisabled(); // nothing changed yet
+    await fireEvent.changeText(screen.getByLabelText('Second Age'), '250');
+    await fireEvent.press(saveYears);
+    expect(jest.mocked(gameApi).gmSetRules).toHaveBeenCalledWith('w1', {
+      finalSay: false,
+      alignmentCap: null,
+      yearsPerRound: [500, 250, 5],
+    });
+  });
+
+  it('shows everyone else the GM’s rules, read-only', async () => {
+    mockUser = 'u-bob';
+    gmLobby('u-host', { gm_final_say: true, alignment_cap: 3, years_per_round: [300, 50, 2] });
+    await render(<WorldSettingsScreen />);
+    expect(await screen.findByText(/u-host is the GM/)).toBeTruthy();
+    expect(screen.getByLabelText('The GM rules').props.accessibilityState).toMatchObject({
+      checked: true,
+    });
+    expect(screen.getByText('300 / 50 / 2 years in the three ages (set by the GM).')).toBeTruthy();
+    await fireEvent.press(screen.getByLabelText('No limit'));
+    expect(jest.mocked(gameApi).gmSetRules).not.toHaveBeenCalled();
+    expect(screen.queryByLabelText('Second Age')).toBeNull();
   });
 });

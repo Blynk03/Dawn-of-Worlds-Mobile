@@ -10,6 +10,7 @@ import {
   castVote,
   closeBattle,
   disputeBonus,
+  gmRule,
   proposeBonus,
   type VoteChoice,
   waiveReaction,
@@ -29,11 +30,22 @@ type Props = {
   view: GameView;
   gods: God[];
   myGodId: string | null;
+  /** DOW-62: you're the GM and have the final say on disputed bonuses. */
+  canRule?: boolean;
   now: Date;
   onChanged: () => void;
 };
 
-export function BattleCard({ worldId, battle, view, gods, myGodId, now, onChanged }: Props) {
+export function BattleCard({
+  worldId,
+  battle,
+  view,
+  gods,
+  myGodId,
+  canRule = false,
+  now,
+  onChanged,
+}: Props) {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const godName = (id: string | null) => gods.find((g) => g.id === id)?.name ?? 'A god';
@@ -76,6 +88,7 @@ export function BattleCard({ worldId, battle, view, gods, myGodId, now, onChange
     battle,
     view,
     myGodId,
+    canRule,
     busy,
     godName,
     run,
@@ -123,6 +136,7 @@ function Side({
   battle,
   view,
   myGodId,
+  canRule,
   busy,
   godName,
   run,
@@ -133,6 +147,7 @@ function Side({
   battle: DeclaredBattleView;
   view: GameView;
   myGodId: string | null;
+  canRule: boolean;
   busy: string | null;
   godName: (id: string | null) => string;
   run: (key: string, work: () => Promise<unknown>) => void;
@@ -152,6 +167,7 @@ function Side({
       ) : null}
       {bonuses.map((bonus) => {
         const vote = view.proposals.find((p) => p.bonusId === bonus.id && p.status === 'open');
+        const byGm = view.proposals.some((p) => p.bonusId === bonus.id && p.byGm);
         const counts = vote ? voteCounts(vote) : null;
         const mine = vote && myGodId ? vote.votes[myGodId] : undefined;
         const castOn = (choice: VoteChoice) => () =>
@@ -164,8 +180,8 @@ function Side({
               +1 {bonus.label}
               {` · ${godName(bonus.godId)}`}
               {bonus.status === 'disputed' ? ' · disputed' : ''}
-              {bonus.status === 'kept' ? ' · kept by vote' : ''}
-              {bonus.status === 'dropped' ? ' · dropped by vote' : ''}
+              {bonus.status === 'kept' ? ` · kept by ${byGm ? 'the GM' : 'vote'}` : ''}
+              {bonus.status === 'dropped' ? ` · dropped by ${byGm ? 'the GM' : 'vote'}` : ''}
             </ThemedText>
             {vote && counts ? (
               <View style={styles.row}>
@@ -185,6 +201,22 @@ function Side({
                       selected={mine === 'drop'}
                       disabled={!!busy}
                       onPress={castOn('drop')}
+                    />
+                  </>
+                ) : null}
+                {canRule ? (
+                  <>
+                    <Chip
+                      label="GM: count it"
+                      selected={false}
+                      disabled={!!busy}
+                      onPress={() => run(`${bonus.id}:gm`, () => gmRule(worldId, vote.id, 'keep'))}
+                    />
+                    <Chip
+                      label="GM: drop it"
+                      selected={false}
+                      disabled={!!busy}
+                      onPress={() => run(`${bonus.id}:gm`, () => gmRule(worldId, vote.id, 'drop'))}
                     />
                   </>
                 ) : null}

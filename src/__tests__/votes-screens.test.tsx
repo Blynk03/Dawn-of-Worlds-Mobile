@@ -43,11 +43,16 @@ const ageVote = (votes: Record<string, string>): ProposalView => ({
   status: 'open',
   votes,
   coin: null,
+  byGm: false,
   seq: 999,
   at: '',
 });
 
-function show(view: Partial<GameView>, myGodId: string | null = g1) {
+function show(
+  view: Partial<GameView>,
+  myGodId: string | null = g1,
+  gm?: { isMe: boolean; finalSay: boolean },
+) {
   const onChanged = jest.fn();
   return render(
     <TableVotes
@@ -55,6 +60,7 @@ function show(view: Partial<GameView>, myGodId: string | null = g1) {
       view={{ ...base, proposals: [], ...view }}
       gods={gods}
       myGodId={myGodId}
+      gm={gm}
       now={now}
       onChanged={onChanged}
     />,
@@ -307,5 +313,119 @@ describe('A declared battle (DOW-56/54)', () => {
   it('shows nothing once it has been fought', async () => {
     await show({ ...view, battles: [{ ...declared, status: 'resolved', outcome: 'won' }] });
     expect(screen.queryByText(/marches on Karak/)).toBeNull();
+  });
+});
+
+describe('The GM (DOW-62)', () => {
+  const attack = base.actions.find((a) => a.intent === 'attack')!;
+  const objection: ProposalView = {
+    ...ageVote({ [g2]: 'undo' }),
+    id: 'p-obj',
+    kind: 'objection',
+    targetSeq: attack.seq,
+    age: null,
+    reason: 'No',
+    closesAt: '2026-11-04T05:00:00Z',
+  };
+
+  beforeEach(() => {
+    api.gmRule.mockResolvedValue('undone');
+    api.gmRuleNontraditional.mockResolvedValue('charged');
+  });
+
+  it('rules on an objection when the GM has the final say', async () => {
+    await show({ proposals: [objection] }, null, { isMe: true, finalSay: true });
+    expect(screen.getByText(/The GM can settle it at any time/)).toBeTruthy();
+    await fireEvent.press(screen.getByRole('button', { name: 'GM: undo it' }));
+    expect(api.gmRule).toHaveBeenCalledWith('w1', 'p-obj', 'undo');
+  });
+
+  it('not without the final say, nor for anyone else', async () => {
+    await show({ proposals: [objection] }, null, { isMe: true, finalSay: false });
+    expect(screen.queryByRole('button', { name: /^GM:/ })).toBeNull();
+    await show({ proposals: [objection] }, g1, { isMe: false, finalSay: true });
+    expect(screen.queryByRole('button', { name: /^GM:/ })).toBeNull();
+  });
+
+  it('rules on a disputed battle bonus', async () => {
+    const declared = { ...base.battles[0], closesAt: '2026-11-04T12:00:00Z' };
+    const dispute = base.proposals.find((p) => p.kind === 'bonus')!;
+    await show({ battles: [declared], proposals: base.proposals }, null, {
+      isMe: true,
+      finalSay: true,
+    });
+    await fireEvent.press(screen.getByLabelText('GM: drop it'));
+    expect(api.gmRule).toHaveBeenCalledWith('w1', dispute.id, 'drop');
+  });
+
+  describe('non-traditional races', () => {
+    const race = base.actions.find((a) => a.power === 'createRace')!;
+    const gmMember = {
+      world_id: 'w1',
+      user_id: 'u-gm',
+      role: 'host' as const,
+      is_gm: true,
+      joined_at: '',
+      profiles: { display_name: 'Gwen' },
+    };
+    const card = (view: GameView, myId: string, at = race.at) =>
+      render(
+        <FeedCard
+          worldId="w1"
+          action={{ ...race, at }}
+          view={view}
+          gods={gods}
+          members={[gmMember]}
+          myId={myId}
+          comments={[]}
+          reactions={[]}
+          now={now}
+          objectionHours={12}
+          onChanged={jest.fn()}
+          onOpenEntity={jest.fn()}
+          onOpenHex={jest.fn()}
+        />,
+      );
+
+    it('lets the GM rule a new race non-traditional', async () => {
+      await card(base, 'u-gm', '2026-11-04T00:00:00Z');
+      await fireEvent.press(
+        screen.getByRole('button', { name: 'GM: non-traditional (costs double)' }),
+      );
+      expect(screen.getByText(/Their creator pays the cost again/)).toBeTruthy();
+      await fireEvent.press(screen.getByRole('button', { name: 'Rule it non-traditional' }));
+      expect(api.gmRuleNontraditional).toHaveBeenCalledWith('w1', race.seq);
+    });
+
+    it('only the GM, and only while the window is open', async () => {
+      await card(base, 'u-someone', '2026-11-04T00:00:00Z');
+      expect(screen.queryByRole('button', { name: /non-traditional/ })).toBeNull();
+      await card(base, 'u-gm', '2026-11-03T00:00:00Z');
+      expect(screen.queryByRole('button', { name: /non-traditional/ })).toBeNull();
+    });
+
+    it('shows the ruling', async () => {
+      const ruled: GameView = {
+        ...base,
+        gmRulings: [
+          {
+            seq: 999,
+            at: '',
+            kind: 'nontraditional',
+            targetSeq: race.seq,
+            proposalId: null,
+            outcome: null,
+            note: 'Stone that walks',
+            charged: race.cost,
+          },
+        ],
+      };
+      await card(ruled, 'u-someone');
+      expect(
+        screen.getByText(
+          `The GM ruled this race non-traditional: it cost double (+${race.cost}). “Stone that walks”`,
+        ),
+      ).toBeTruthy();
+    });
   });
 });
