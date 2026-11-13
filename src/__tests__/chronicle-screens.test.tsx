@@ -89,6 +89,9 @@ const world = (o: Partial<World> = {}): World => ({
   reminder_hours: 24,
   objection_hours: 12,
   reaction_hours: 12,
+  gm_final_say: false,
+  alignment_cap: null,
+  years_per_round: null,
   created_by: 'u-me',
   created_at: '',
   updated_at: '',
@@ -264,6 +267,23 @@ describe('Ages and undone actions in the chronicle (DOW-52/53)', () => {
       payload: { ...(action.payload as object), choice: 'desert', description: 'Dry times' },
     },
   ];
+
+  it('logs the GM’s rule changes in the feed (DOW-62)', async () => {
+    const ruling: GameEvent = {
+      ...last,
+      seq: last.seq + 1,
+      type: 'gm_ruling',
+      god_id: null,
+      payload: { kind: 'rules', alignment_cap: 5, final_say: true },
+    };
+    game.loadGameEvents.mockResolvedValue([...events, ruling]);
+    await render(<ChronicleScreen />);
+    expect(
+      await screen.findByText(
+        'GM ruling: the GM now has the final say on objections and disputed bonuses; alignment is capped at ±5.',
+      ),
+    ).toBeTruthy();
+  });
 
   it('marks where a new age begins, in the feed and the History Chart', async () => {
     game.loadGameEvents.mockResolvedValue([...events, ...later]);

@@ -18,7 +18,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import { useGame, useNow } from '@/game/hooks';
-import { type ActionRecord, ageName, type GameView } from '@/game/project';
+import { type ActionRecord, type GmRuling, ageName, type GameView } from '@/game/project';
 import { useLayoutMode } from '@/hooks/use-layout-mode';
 import type { God } from '@/lib/database.types';
 import { useLobby } from '@/worlds/hooks';
@@ -86,6 +86,13 @@ export default function ChronicleScreen() {
           ListEmptyComponent={<Empty />}
           renderItem={({ item, index }) => (
             <>
+              {rulesChangedBetween(
+                view.gmRulings,
+                item.seq,
+                view.actions[view.actions.length - index]?.seq ?? Infinity,
+              ).map((r) => (
+                <GmRulesNote key={r.seq} ruling={r} />
+              ))}
               <FeedCard
                 worldId={id}
                 action={item}
@@ -240,6 +247,43 @@ function History({
         </>
       )}
     />
+  );
+}
+
+/** DOW-62: the GM's changes to the rules logged after one action and before the next. */
+function rulesChangedBetween(rulings: GmRuling[], after: number, before: number): GmRuling[] {
+  return rulings.filter((r) => r.kind === 'rules' && r.seq > after && r.seq < before).reverse();
+}
+
+function GmRulesNote({ ruling }: { ruling: GmRuling }) {
+  const parts: string[] = [];
+  if (ruling.finalSay !== undefined) {
+    parts.push(
+      ruling.finalSay
+        ? 'the GM now has the final say on objections and disputed bonuses'
+        : 'objections and disputed bonuses are settled by vote again',
+    );
+  }
+  if (ruling.alignmentCap !== undefined) {
+    parts.push(
+      ruling.alignmentCap === null
+        ? 'alignment has no limit'
+        : `alignment is capped at ±${ruling.alignmentCap}`,
+    );
+  }
+  if (ruling.yearsPerRound !== undefined) {
+    parts.push(
+      ruling.yearsPerRound
+        ? `a round lasts ${ruling.yearsPerRound.join(' / ')} years in the three ages`
+        : 'rounds last the usual number of years',
+    );
+  }
+  return (
+    <View style={styles.divider}>
+      <ThemedText type="small" themeColor="accent">
+        GM ruling: {parts.join('; ')}.
+      </ThemedText>
+    </View>
   );
 }
 

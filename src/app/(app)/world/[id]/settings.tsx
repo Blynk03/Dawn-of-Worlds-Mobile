@@ -4,6 +4,7 @@ import { ActivityIndicator, Platform, ScrollView, StyleSheet, Switch, View } fro
 
 import { useAuth } from '@/auth/auth-provider';
 import { Card, Chip, ErrorMessage, SectionLabel } from '@/components/game-ui';
+import { GmRulesCard } from '@/components/gm-rules';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
@@ -32,7 +33,10 @@ const DEVICE_STATUS: Record<PushStatus, string> = {
     'Notifications go to the Android app. In the browser, watch for the “new” badges on your worlds.',
 };
 
-/** DOW-16/28: notification settings for one world; DOW-53/56: the objection and battle windows. */
+/**
+ * DOW-16/28: notification settings for one world; DOW-53/56: the objection and battle windows;
+ * DOW-62: the GM's rules.
+ */
 export default function WorldSettingsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { session } = useAuth();
@@ -144,6 +148,16 @@ export default function WorldSettingsScreen() {
             ))}
           </View>
         </Card>
+
+        <GmRulesCard
+          world={world}
+          gmName={(() => {
+            const gm = members.find((m) => m.is_gm);
+            return gm ? (gm.profiles?.display_name ?? 'The GM') : null;
+          })()}
+          isGm={members.some((m) => m.user_id === session?.user.id && m.is_gm)}
+          onSaved={lobby.refresh}
+        />
 
         <Card>
           <SectionLabel>Before a battle</SectionLabel>

@@ -44,6 +44,9 @@ export type Database = {
           reminder_hours: number;
           objection_hours: number;
           reaction_hours: number;
+          gm_final_say: boolean;
+          alignment_cap: number | null;
+          years_per_round: number[] | null;
           created_by: string;
           created_at: string;
           updated_at: string;
@@ -58,6 +61,9 @@ export type Database = {
           reminder_hours?: number;
           objection_hours?: number;
           reaction_hours?: number;
+          gm_final_say?: boolean;
+          alignment_cap?: number | null;
+          years_per_round?: number[] | null;
           created_by?: string;
           created_at?: string;
           updated_at?: string;
@@ -68,6 +74,9 @@ export type Database = {
           reminder_hours?: number;
           objection_hours?: number;
           reaction_hours?: number;
+          gm_final_say?: boolean;
+          alignment_cap?: number | null;
+          years_per_round?: number[] | null;
         };
         Relationships: [
           {
@@ -355,6 +364,23 @@ export type Database = {
         Returns: string | null;
       };
       delete_my_account: { Args: Record<string, never>; Returns: undefined };
+      gm_rule: {
+        Args: { target_world: string; proposal: string; choice: string; note: string };
+        Returns: string;
+      };
+      gm_rule_nontraditional: {
+        Args: { target_world: string; action_seq: number; note: string };
+        Returns: string;
+      };
+      gm_set_rules: {
+        Args: {
+          target_world: string;
+          final_say: boolean;
+          cap: number | null;
+          years: number[] | null;
+        };
+        Returns: undefined;
+      };
       declare_attack: {
         Args: {
           target_world: string;

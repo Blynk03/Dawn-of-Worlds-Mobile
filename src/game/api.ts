@@ -517,3 +517,54 @@ export async function setReactionHours(worldId: string, hours: number): Promise<
     .eq('id', worldId);
   if (error) throw new Error(friendlyError(error));
 }
+
+/** DOW-62: the GM's ruling on an objection (keep/undo) or a disputed bonus (keep/drop). */
+export async function gmRule(
+  worldId: string,
+  proposalId: string,
+  choice: 'keep' | 'undo' | 'drop',
+  note = '',
+): Promise<string> {
+  const { data, error } = await client().rpc('gm_rule', {
+    target_world: worldId,
+    proposal: proposalId,
+    choice,
+    note,
+  });
+  if (error) throw new Error(friendlyError(error));
+  return data;
+}
+
+/** DOW-62: the GM rules a new race non-traditional: its creator pays double, or it's undone. */
+export async function gmRuleNontraditional(
+  worldId: string,
+  seq: number,
+  note = '',
+): Promise<'charged' | 'undone'> {
+  const { data, error } = await client().rpc('gm_rule_nontraditional', {
+    target_world: worldId,
+    action_seq: seq,
+    note,
+  });
+  if (error) throw new Error(friendlyError(error));
+  return data === 'undone' ? 'undone' : 'charged';
+}
+
+export type GmRules = {
+  finalSay: boolean;
+  /** ±cap on alignment, or null for no limit. */
+  alignmentCap: number | null;
+  /** Years per round in each age, or null for the ruleset's. */
+  yearsPerRound: [number, number, number] | null;
+};
+
+/** DOW-62: the GM's rules for the world (logged in the chronicle once the game has started). */
+export async function gmSetRules(worldId: string, rules: GmRules): Promise<void> {
+  const { error } = await client().rpc('gm_set_rules', {
+    target_world: worldId,
+    final_say: rules.finalSay,
+    cap: rules.alignmentCap,
+    years: rules.yearsPerRound,
+  });
+  if (error) throw new Error(friendlyError(error));
+}

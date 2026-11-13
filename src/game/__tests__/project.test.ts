@@ -534,6 +534,57 @@ describe('applying events incrementally', () => {
     expect(next.ageChanges).toEqual([{ age: 2, name: 'Second Age', round: 9, seq }]);
   });
 
+  it('records the GM’s rulings (DOW-62)', () => {
+    const base = projectWorld(events);
+    const objection = base.proposals.find((p) => p.kind === 'objection')!;
+    const race = base.actions.find((a) => a.power === 'createRace')!;
+    let seq = base.lastSeq;
+    const ev = (payload: Record<string, unknown>): GameEvent => ({
+      seq: ++seq,
+      type: 'gm_ruling',
+      age: 1,
+      round: base.round,
+      god_id: null,
+      payload,
+      created_at: '2026-11-05T00:00:00Z',
+    });
+    const after = projectWorld(
+      [
+        ev({ kind: 'rules', final_say: true, alignment_cap: 3, years_per_round: [300, 50, 2] }),
+        ev({
+          kind: 'objection',
+          proposal_id: objection.id,
+          seq: objection.targetSeq,
+          outcome: 'undone',
+          note: 'Fair',
+        }),
+        ev({
+          kind: 'nontraditional',
+          seq: race.seq,
+          charged: race.cost,
+          god_id: race.godId,
+          power_after: 3,
+          note: '',
+        }),
+      ],
+      base,
+    );
+    expect(after.gmRulings.map((r) => r.kind)).toEqual(['rules', 'objection', 'nontraditional']);
+    expect(after.gmRulings[0]).toMatchObject({
+      finalSay: true,
+      alignmentCap: 3,
+      yearsPerRound: [300, 50, 2],
+    });
+    expect(after.gmRulings[1]).toMatchObject({
+      outcome: 'undone',
+      note: 'Fair',
+      targetSeq: objection.targetSeq,
+    });
+    expect(after.proposals.find((p) => p.id === objection.id)!.byGm).toBe(true);
+    expect(after.gmRulings[2]).toMatchObject({ targetSeq: race.seq, charged: race.cost });
+    expect(after.powers[race.godId!].power).toBe(3);
+  });
+
   it('ignores events it has already applied (realtime re-delivery)', () => {
     const once = projectWorld(events);
     expect(projectWorld(events, once)).toEqual(once);

@@ -8,7 +8,7 @@ import { Button } from '@/components/form';
 import { Card, Chip, ErrorMessage, SectionLabel } from '@/components/game-ui';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
-import { castVote, closeVote, proposeNextAge, type VoteChoice } from '@/game/api';
+import { castVote, closeVote, gmRule, proposeNextAge, type VoteChoice } from '@/game/api';
 import { ageName, describeDeadline, type GameView, type ProposalView } from '@/game/project';
 import { isExpired, openProposals, voteCounts } from '@/game/votes';
 import type { God } from '@/lib/database.types';
@@ -19,6 +19,8 @@ type Props = {
   view: GameView;
   gods: God[];
   myGodId: string | null;
+  /** DOW-62: whether you're the GM, and whether the GM has the final say. */
+  gm?: { isMe: boolean; finalSay: boolean };
   now: Date;
   /** Called after voting or proposing, so the game refreshes at once. */
   onChanged: () => void;
@@ -31,7 +33,16 @@ const OBJECTION_CHOICES: { choice: VoteChoice; label: string }[] = [
 ];
 
 /** The next age, battles waiting to be rolled, and any open votes. */
-export function TableVotes({ worldId, view, gods, myGodId, now, onChanged }: Props) {
+export function TableVotes({
+  worldId,
+  view,
+  gods,
+  myGodId,
+  gm = { isMe: false, finalSay: false },
+  now,
+  onChanged,
+}: Props) {
+  const canRule = gm.isMe && gm.finalSay;
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const open = openProposals(view);
@@ -100,6 +111,7 @@ export function TableVotes({ worldId, view, gods, myGodId, now, onChanged }: Pro
             view={view}
             gods={gods}
             myGodId={myGodId}
+            canRule={canRule}
             now={now}
             onChanged={onChanged}
           />
@@ -115,6 +127,12 @@ export function TableVotes({ worldId, view, gods, myGodId, now, onChanged }: Pro
           now={now}
           busy={busy}
           onVote={vote}
+          onRule={
+            canRule
+              ? (choice) => run(`${p.id}:gm:${choice}`, () => gmRule(worldId, p.id, choice))
+              : undefined
+          }
+          finalSay={gm.finalSay}
         />
       ))}
       <ErrorMessage message={error} />
@@ -232,6 +250,8 @@ function Objection({
   now,
   busy,
   onVote,
+  onRule,
+  finalSay,
 }: {
   proposal: ProposalView;
   view: GameView;
@@ -241,6 +261,9 @@ function Objection({
   now: Date;
   busy: string | null;
   onVote: (p: ProposalView, choice: VoteChoice) => void;
+  /** DOW-62: the GM's final ruling. */
+  onRule?: (choice: 'keep' | 'undo') => void;
+  finalSay: boolean;
 }) {
   const action = view.actions.find((a) => a.seq === proposal.targetSeq);
   const counts = voteCounts(proposal);
@@ -261,6 +284,7 @@ function Objection({
         Keep {counts.keep} · Undo {counts.undo} · Coin {counts.coin} of {gods.length}
         {ends ? ` · ${ends.replace('Ends', 'Closes')}` : ''}. More than half decides; a tie is
         settled by a coin flip. Undoing it refunds it, along with anything built on it.
+        {finalSay ? ' The GM can settle it at any time.' : ''}
       </ThemedText>
       {myGodId ? (
         <View style={styles.choices}>
@@ -273,6 +297,22 @@ function Objection({
               onPress={() => onVote(proposal, choice)}
             />
           ))}
+        </View>
+      ) : null}
+      {onRule ? (
+        <View style={styles.choices}>
+          <Button
+            title="GM: keep it"
+            variant="secondary"
+            onPress={() => onRule('keep')}
+            disabled={!!busy}
+          />
+          <Button
+            title="GM: undo it"
+            variant="secondary"
+            onPress={() => onRule('undo')}
+            disabled={!!busy}
+          />
         </View>
       ) : null}
     </Card>

@@ -102,6 +102,8 @@ export type ProposalView = {
   votes: Record<string, string>;
   /** The server's coin flip, if it came to that: 1 keeps, 2 undoes. */
   coin: number | null;
+  /** DOW-62: settled by the GM's ruling. */
+  byGm: boolean;
   seq: number;
   at: string;
 };
@@ -136,6 +138,24 @@ export type DeclaredBattleView = {
   waived: string[];
   seq: number;
   at: string;
+};
+
+/** DOW-62: a GM ruling or change to the GM's rules, logged in the chronicle. */
+export type GmRuling = {
+  seq: number;
+  at: string;
+  kind: 'rules' | 'objection' | 'bonus' | 'nontraditional';
+  /** What was ruled on: an action (objections, races). */
+  targetSeq: number | null;
+  proposalId: string | null;
+  outcome: string | null;
+  note: string;
+  /** Non-traditional races: what the creator paid again (0 if the race was undone instead). */
+  charged: number;
+  /** Rules changes. */
+  finalSay?: boolean;
+  alignmentCap?: number | null;
+  yearsPerRound?: number[] | null;
 };
 
 /** DOW-52: when an age began. */
@@ -285,6 +305,8 @@ export type GameView = {
   advancements: AdvancementView[];
   /** DOW-17: gods whose players deleted their accounts; they take no more turns. */
   departedGods: string[];
+  /** DOW-62: the GM's rulings, oldest first. */
+  gmRulings: GmRuling[];
   /** DOW-56: declared battles, oldest first. */
   battles: DeclaredBattleView[];
   /** DOW-52/53: every vote, oldest first. */
@@ -328,6 +350,7 @@ export const EMPTY_GAME: GameView = {
   armies: [],
   structures: [],
   departedGods: [],
+  gmRulings: [],
   battles: [],
   proposals: [],
   ageStartedRound: 1,
@@ -691,6 +714,46 @@ export function applyEvent(view: GameView, event: GameEvent): GameView {
       return next;
     }
 
+    case 'gm_ruling': {
+      const kinds = ['rules', 'objection', 'bonus', 'nontraditional'] as const;
+      const kind = kinds.find((k) => k === p.kind) ?? 'rules';
+      const ruling: GmRuling = {
+        seq: event.seq,
+        at: event.created_at,
+        kind,
+        targetSeq: typeof p.seq === 'number' ? p.seq : null,
+        proposalId: str(p.proposal_id),
+        outcome: str(p.outcome),
+        note: str(p.note) ?? '',
+        charged: num(p.charged),
+      };
+      if ('final_say' in p) ruling.finalSay = p.final_say === true;
+      if ('alignment_cap' in p)
+        ruling.alignmentCap = typeof p.alignment_cap === 'number' ? p.alignment_cap : null;
+      if ('years_per_round' in p) {
+        ruling.yearsPerRound = Array.isArray(p.years_per_round)
+          ? p.years_per_round.map((y) => num(y))
+          : null;
+      }
+      next.gmRulings = [...view.gmRulings, ruling];
+      if (ruling.proposalId) {
+        next.proposals = view.proposals.map((x) =>
+          x.id === ruling.proposalId ? { ...x, byGm: true } : x,
+        );
+      }
+      const god = str(p.god_id);
+      if (kind === 'nontraditional' && god && ruling.charged > 0) {
+        next.powers = {
+          ...view.powers,
+          [god]: {
+            power: num(p.power_after, view.powers[god]?.power ?? 0),
+            lowPoolBonus: view.powers[god]?.lowPoolBonus ?? 0,
+          },
+        };
+      }
+      return next;
+    }
+
     case 'battle_declared': {
       const id = str(p.battle_id);
       const army = asObj(p.army);
@@ -813,6 +876,7 @@ export function applyEvent(view: GameView, event: GameEvent): GameView {
           status: 'open',
           votes: {},
           coin: null,
+          byGm: false,
           seq: event.seq,
           at: event.created_at,
         },

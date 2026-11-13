@@ -82,7 +82,14 @@ export default function WorldScreen() {
     return (
       <ThemedView style={styles.fill}>
         <Stack.Screen options={{ title: world.name }} />
-        <ActiveWorld worldId={world.id} gods={gods} members={members} myId={myId} focusHex={hex} />
+        <ActiveWorld
+          worldId={world.id}
+          gods={gods}
+          members={members}
+          myId={myId}
+          focusHex={hex}
+          gmFinalSay={world.gm_final_say}
+        />
       </ThemedView>
     );
   }
