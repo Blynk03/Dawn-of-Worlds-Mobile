@@ -79,10 +79,13 @@ export type ActionRecord = HexChange & {
   undoneBecauseOf: number | null;
 };
 
-/** DOW-52/53: a vote: on moving to the next age, or on an objection to an action. */
+/** DOW-52/53/54: a vote: on the next age, an objection to an action, or a disputed battle bonus. */
 export type ProposalView = {
   id: string;
-  kind: 'advanceAge' | 'objection';
+  kind: 'advanceAge' | 'objection' | 'bonus';
+  /** A disputed bonus's battle and bonus. */
+  battleId: string | null;
+  bonusId: string | null;
   /** Who proposed or objected. */
   godId: string | null;
   /** An objection's action. */
@@ -94,11 +97,43 @@ export type ProposalView = {
   reason: string;
   /** When an objection's vote closes (ISO time); age votes last until the round ends. */
   closesAt: string | null;
-  status: 'open' | 'passed' | 'failed' | 'expired' | 'kept' | 'undone';
+  status: 'open' | 'passed' | 'failed' | 'expired' | 'kept' | 'undone' | 'dropped';
   /** Each god's vote: yes / no on an age, keep / undo / coin on an objection. */
   votes: Record<string, string>;
   /** The server's coin flip, if it came to that: 1 keeps, 2 undoes. */
   coin: number | null;
+  seq: number;
+  at: string;
+};
+
+/** DOW-54: a +1 proposed for one side of a declared battle. */
+export type BonusView = {
+  id: string;
+  side: 'attacker' | 'defender';
+  label: string;
+  godId: string | null;
+  /** Disputed bonuses are voted on; only agreed and kept ones count. */
+  status: 'agreed' | 'disputed' | 'kept' | 'dropped';
+};
+
+/** DOW-56: an attack waiting out its reaction window (and how it ended). */
+export type DeclaredBattleView = {
+  id: string;
+  godId: string | null;
+  army: { id: string; name: string };
+  target: { kind: 'army' | 'city'; id: string; name: string };
+  utterlyDestroy: boolean;
+  description: string;
+  cost: number;
+  reserved: number;
+  closesAt: string | null;
+  status: 'pending' | 'resolved' | 'cancelled';
+  outcome: string | null;
+  /** Why a battle was called off. */
+  reason: string | null;
+  bonuses: BonusView[];
+  /** Gods who waived their chance to respond. */
+  waived: string[];
   seq: number;
   at: string;
 };
@@ -250,6 +285,8 @@ export type GameView = {
   advancements: AdvancementView[];
   /** DOW-17: gods whose players deleted their accounts; they take no more turns. */
   departedGods: string[];
+  /** DOW-56: declared battles, oldest first. */
+  battles: DeclaredBattleView[];
   /** DOW-52/53: every vote, oldest first. */
   proposals: ProposalView[];
   /** The round the current age began in. */
@@ -291,6 +328,7 @@ export const EMPTY_GAME: GameView = {
   armies: [],
   structures: [],
   departedGods: [],
+  battles: [],
   proposals: [],
   ageStartedRound: 1,
   agePending: false,
@@ -653,6 +691,101 @@ export function applyEvent(view: GameView, event: GameEvent): GameView {
       return next;
     }
 
+    case 'battle_declared': {
+      const id = str(p.battle_id);
+      const army = asObj(p.army);
+      const target = asObj(p.target);
+      if (!id) return next;
+      next.battles = [
+        ...view.battles,
+        {
+          id,
+          godId: event.god_id,
+          army: { id: str(army.id) ?? '', name: str(army.name) ?? 'An army' },
+          target: {
+            kind: target.kind === 'army' ? 'army' : 'city',
+            id: str(target.id) ?? '',
+            name: str(target.name) ?? '',
+          },
+          utterlyDestroy: p.utterly_destroy === true,
+          description: str(p.description) ?? '',
+          cost: num(p.cost),
+          reserved: num(p.reserved),
+          closesAt: str(p.closes_at),
+          status: 'pending',
+          outcome: null,
+          reason: null,
+          bonuses: [],
+          waived: [],
+          seq: event.seq,
+          at: event.created_at,
+        },
+      ];
+      if (event.god_id) {
+        next.powers = {
+          ...view.powers,
+          [event.god_id]: {
+            power: num(p.power_after, view.powers[event.god_id]?.power ?? 0),
+            lowPoolBonus: view.powers[event.god_id]?.lowPoolBonus ?? 0,
+          },
+        };
+      }
+      return next;
+    }
+
+    case 'bonus_proposed': {
+      const battleId = str(p.battle_id);
+      const bonusId = str(p.bonus_id);
+      if (!battleId || !bonusId) return next;
+      const bonus: BonusView = {
+        id: bonusId,
+        side: p.side === 'defender' ? 'defender' : 'attacker',
+        label: str(p.label) ?? '',
+        godId: event.god_id,
+        status: 'agreed',
+      };
+      next.battles = view.battles.map((b) =>
+        b.id === battleId ? { ...b, bonuses: [...b.bonuses, bonus] } : b,
+      );
+      return next;
+    }
+
+    case 'reaction_waived': {
+      const battleId = str(p.battle_id);
+      const god = event.god_id;
+      if (!battleId || !god) return next;
+      next.battles = view.battles.map((b) =>
+        b.id === battleId ? { ...b, waived: [...b.waived, god] } : b,
+      );
+      return next;
+    }
+
+    case 'battle_resolved':
+    case 'battle_cancelled': {
+      const battleId = str(p.battle_id);
+      const cancelled = event.type === 'battle_cancelled';
+      next.battles = view.battles.map((b) =>
+        b.id === battleId
+          ? {
+              ...b,
+              status: cancelled ? 'cancelled' : 'resolved',
+              outcome: str(p.outcome),
+              reason: str(p.reason),
+            }
+          : b,
+      );
+      if (cancelled && event.god_id) {
+        next.powers = {
+          ...view.powers,
+          [event.god_id]: {
+            power: num(p.power_after, view.powers[event.god_id]?.power ?? 0),
+            lowPoolBonus: view.powers[event.god_id]?.lowPoolBonus ?? 0,
+          },
+        };
+      }
+      return next;
+    }
+
     case 'god_departed': {
       const god = str(p.god_id);
       if (!god) return next;
@@ -668,7 +801,9 @@ export function applyEvent(view: GameView, event: GameEvent): GameView {
         ...view.proposals,
         {
           id,
-          kind: p.kind === 'objection' ? 'objection' : 'advanceAge',
+          kind: p.kind === 'objection' ? 'objection' : p.kind === 'bonus' ? 'bonus' : 'advanceAge',
+          battleId: str(p.battle_id),
+          bonusId: str(p.bonus_id),
           godId: event.god_id,
           targetSeq: typeof p.target_seq === 'number' ? p.target_seq : null,
           age: typeof p.age === 'number' ? p.age : null,
@@ -682,6 +817,9 @@ export function applyEvent(view: GameView, event: GameEvent): GameView {
           at: event.created_at,
         },
       ];
+      if (p.kind === 'bonus') {
+        next.battles = withBonus(view.battles, str(p.bonus_id), 'disputed');
+      }
       return next;
     }
 
@@ -705,6 +843,10 @@ export function applyEvent(view: GameView, event: GameEvent): GameView {
           : x,
       );
       if (p.kind === 'advance_age' && outcome === 'passed') next.agePending = true;
+      if (p.kind === 'bonus' && (outcome === 'kept' || outcome === 'dropped')) {
+        const bonusId = view.proposals.find((x) => x.id === id)?.bonusId ?? null;
+        next.battles = withBonus(view.battles, bonusId, outcome);
+      }
       return next;
     }
 
@@ -776,7 +918,21 @@ const PROPOSAL_STATUSES: ProposalView['status'][] = [
   'expired',
   'kept',
   'undone',
+  'dropped',
 ];
+
+function withBonus(
+  battles: DeclaredBattleView[],
+  bonusId: string | null,
+  status: BonusView['status'],
+): DeclaredBattleView[] {
+  if (!bonusId) return battles;
+  return battles.map((b) =>
+    b.bonuses.some((x) => x.id === bonusId)
+      ? { ...b, bonuses: b.bonuses.map((x) => (x.id === bonusId ? { ...x, status } : x)) }
+      : b,
+  );
+}
 
 function targetOf(v: unknown): ActionTarget | null {
   const t = asObj(v);

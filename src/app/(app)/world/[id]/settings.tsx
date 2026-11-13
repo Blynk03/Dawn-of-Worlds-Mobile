@@ -14,7 +14,12 @@ import {
   setWorldMuted,
 } from '@/notifications/api';
 import { type PushStatus, registerForPush } from '@/notifications/push';
-import { OBJECTION_OPTIONS, setObjectionHours } from '@/game/api';
+import {
+  OBJECTION_OPTIONS,
+  REACTION_OPTIONS,
+  setObjectionHours,
+  setReactionHours,
+} from '@/game/api';
 import { useLobby } from '@/worlds/hooks';
 
 const DEVICE_STATUS: Record<PushStatus, string> = {
@@ -27,7 +32,7 @@ const DEVICE_STATUS: Record<PushStatus, string> = {
     'Notifications go to the Android app. In the browser, watch for the “new” badges on your worlds.',
 };
 
-/** DOW-16/28: notification settings for one world; DOW-53: the objection window. */
+/** DOW-16/28: notification settings for one world; DOW-53/56: the objection and battle windows. */
 export default function WorldSettingsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { session } = useAuth();
@@ -135,6 +140,25 @@ export default function WorldSettingsScreen() {
                 label={hours === 0 ? 'Off' : hours === 1 ? '1 hour' : `${hours} hours`}
                 selected={(world.objection_hours ?? 12) === hours}
                 onPress={isHost ? () => choose(setObjectionHours, hours) : () => {}}
+              />
+            ))}
+          </View>
+        </Card>
+
+        <Card>
+          <SectionLabel>Before a battle</SectionLabel>
+          <ThemedText type="small" themeColor="textSecondary">
+            How long the other gods have to respond to a declared attack (or waive) before the dice
+            are rolled. “At once” rolls battles straight away.
+            {isHost ? '' : ' The host chooses this.'}
+          </ThemedText>
+          <View style={styles.wrap}>
+            {REACTION_OPTIONS.map((hours) => (
+              <Chip
+                key={hours}
+                label={hours === 0 ? 'At once' : hours === 1 ? '1 hour' : `${hours} hours`}
+                selected={(world.reaction_hours ?? 12) === hours}
+                onPress={isHost ? () => choose(setReactionHours, hours) : () => {}}
               />
             ))}
           </View>

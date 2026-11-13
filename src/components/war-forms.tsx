@@ -162,16 +162,24 @@ function commandable(view: GameView, godId: string): ArmyView[] {
   return view.armies.filter((a) => a.status === 'active' && presentIn(view, godId, a.raceId));
 }
 
+/** DOW-56: an army already marching to a declared battle. */
+function marching(view: GameView, armyId: string): boolean {
+  return view.battles.some((b) => b.status === 'pending' && b.army.id === armyId);
+}
+
 function ArmyPicker({
   view,
   godId,
   armyId,
   onArmy,
+  forBattle = false,
 }: {
   view: GameView;
   godId: string;
   armyId: string | null;
   onArmy: (id: string) => void;
+  /** Armies already marching to a battle can't attack again until it's rolled. */
+  forBattle?: boolean;
 }) {
   const armies = commandable(view, godId);
   return (
@@ -186,8 +194,13 @@ function ArmyPicker({
         {armies.map((a) => (
           <Chip
             key={a.id}
-            label={`${a.name} · ${a.hex.x}, ${a.hex.y}`}
+            label={
+              forBattle && marching(view, a.id)
+                ? `${a.name} · marching to battle`
+                : `${a.name} · ${a.hex.x}, ${a.hex.y}`
+            }
             selected={armyId === a.id}
+            disabled={forBattle && marching(view, a.id)}
             onPress={() => onArmy(a.id)}
           />
         ))}
@@ -325,6 +338,7 @@ export function AttackForm({
   target,
   onTarget,
   prices,
+  reactionHours,
   power,
   busy,
   onSubmit,
@@ -337,6 +351,8 @@ export function AttackForm({
   onTarget: (t: WarTarget | null) => void;
   /** The attack itself (Command Race), destroying an army (Command City), a city (Command Race). */
   prices: { attack: number; army: number; city: number };
+  /** DOW-56: hours the other gods get to respond before the battle is rolled (0 = at once). */
+  reactionHours: number;
   power: number;
   busy: boolean;
   onSubmit: (order: Omit<AttackOrder, 'armyId' | 'target'>) => void;
@@ -372,7 +388,7 @@ export function AttackForm({
 
   return (
     <>
-      <ArmyPicker view={view} godId={godId} armyId={armyId} onArmy={onArmy} />
+      <ArmyPicker view={view} godId={godId} armyId={armyId} onArmy={onArmy} forBattle />
       <SectionLabel>Attack</SectionLabel>
       <View style={styles.wrap}>
         <Chip
@@ -437,6 +453,14 @@ export function AttackForm({
                 </ThemedText>
               ))
             )}
+            {reactionHours > 0 ? (
+              <ThemedText type="small" themeColor="textSecondary">
+                Declaring the attack gives the other gods {reactionHours}{' '}
+                {reactionHours === 1 ? 'hour' : 'hours'} to respond (or waive) before it’s rolled.
+                They can propose more bonuses or dispute these; the defenders count as they stand
+                when the dice are rolled.
+              </ThemedText>
+            ) : null}
             <ThemedText type="small" themeColor="textSecondary">
               Ties are rolled again. Winning moves {army.name} onto {targetName}
               {target?.kind === 'city' ? ' and leaves it in ruins' : ''}; losing scatters it.
@@ -478,7 +502,9 @@ export function AttackForm({
         style={styles.multiline}
       />
       <Button
-        title={targetName ? `Attack ${targetName}` : 'Attack'}
+        title={
+          targetName ? `${reactionHours > 0 ? 'Declare war on' : 'Attack'} ${targetName}` : 'Attack'
+        }
         onPress={() =>
           onSubmit({ attackerModifiers, defenderModifiers, utterlyDestroy: utterly, description })
         }

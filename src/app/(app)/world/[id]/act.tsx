@@ -29,7 +29,6 @@ import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import {
   advance,
-  attack,
   changeAlignment,
   commandAvatar,
   commandCity,
@@ -37,6 +36,7 @@ import {
   createAvatar,
   createOrder,
   createRace,
+  declareAttack,
   createSubrace,
   foundCity,
   marchArmy,
@@ -803,8 +803,9 @@ export default function ActScreen() {
         }}
         power={myPower}
         busy={busy}
+        reactionHours={lobby?.world.reaction_hours ?? 12}
         onSubmit={(order) =>
-          run(() => attack(id, { ...order, armyId: armyId!, target: warTarget! }))
+          run(() => declareAttack(id, { ...order, armyId: armyId!, target: warTarget! }))
         }
       />
     );

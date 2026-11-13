@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { describeAction } from '@/chronicle/history';
+import { BattleCard } from '@/components/battle-card';
 import { Button } from '@/components/form';
 import { Card, Chip, ErrorMessage, SectionLabel } from '@/components/game-ui';
 import { ThemedText } from '@/components/themed-text';
@@ -29,7 +30,7 @@ const OBJECTION_CHOICES: { choice: VoteChoice; label: string }[] = [
   { choice: 'coin', label: 'Flip a coin' },
 ];
 
-/** The next age, and any open votes. */
+/** The next age, battles waiting to be rolled, and any open votes. */
 export function TableVotes({ worldId, view, gods, myGodId, now, onChanged }: Props) {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -45,7 +46,14 @@ export function TableVotes({ worldId, view, gods, myGodId, now, onChanged }: Pro
     for (const p of open) {
       if (isExpired(p, now) && !closing.current.has(p.id)) {
         closing.current.add(p.id);
-        closeVote(worldId, p.id).then(onChanged, () => {});
+        (async () => {
+          try {
+            await closeVote(worldId, p.id);
+            onChanged();
+          } catch {
+            // Someone else closed it first, or the server will on its next pass.
+          }
+        })();
       }
     }
   }, [open, now, worldId, onChanged]);
@@ -82,6 +90,20 @@ export function TableVotes({ worldId, view, gods, myGodId, now, onChanged }: Pro
           onVote={vote}
         />
       </Card>
+      {view.battles
+        .filter((b) => b.status === 'pending')
+        .map((b) => (
+          <BattleCard
+            key={b.id}
+            worldId={worldId}
+            battle={b}
+            view={view}
+            gods={gods}
+            myGodId={myGodId}
+            now={now}
+            onChanged={onChanged}
+          />
+        ))}
       {objections.map((p) => (
         <Objection
           key={p.id}

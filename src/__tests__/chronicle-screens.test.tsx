@@ -88,6 +88,7 @@ const world = (o: Partial<World> = {}): World => ({
   turn_time_limit_hours: null,
   reminder_hours: 24,
   objection_hours: 12,
+  reaction_hours: 12,
   created_by: 'u-me',
   created_at: '',
   updated_at: '',

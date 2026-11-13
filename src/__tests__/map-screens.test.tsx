@@ -45,6 +45,7 @@ const world = (o: Partial<World> = {}): World => ({
   turn_time_limit_hours: null,
   reminder_hours: 24,
   objection_hours: 12,
+  reaction_hours: 12,
   created_by: 'u-active',
   created_at: '',
   updated_at: '',
@@ -777,7 +778,7 @@ describe('Cities and armies (DOW-48/54/55/41)', () => {
     game.loadGameEvents.mockResolvedValue(present());
     game.commandCity.mockResolvedValue();
     game.marchArmy.mockResolvedValue();
-    game.attack.mockResolvedValue('won');
+    game.declareAttack.mockResolvedValue('pending');
     game.commandAvatar.mockResolvedValue();
   });
 
@@ -875,7 +876,10 @@ describe('Cities and armies (DOW-48/54/55/41)', () => {
     expect(game.marchArmy).toHaveBeenCalledWith('w1', host.id, { x: 5, y: 5 }, 'Home again');
   });
 
-  it('attacks a city with chosen bonuses, and can utterly destroy it', async () => {
+  it('declares an attack on a city with chosen bonuses, and can utterly destroy it', async () => {
+    // Without the fixture's own pending battle, so the Host is free to march.
+    const BATTLE = new Set(['battle_declared', 'bonus_proposed']);
+    game.loadGameEvents.mockResolvedValue(present().filter((e) => !BATTLE.has(e.type)));
     await render(<ActScreen />);
     await openPower('Attack');
     await fireEvent.press(screen.getByLabelText('Host of Karak · 7, 4'));
@@ -894,8 +898,10 @@ describe('Cities and armies (DOW-48/54/55/41)', () => {
     await fireEvent.press(screen.getByLabelText('Utterly destroy them · up to +8 power'));
     expect(screen.getByText("Costs 16. You'll have 24 power left.")).toBeTruthy();
     await fireEvent.changeText(screen.getByLabelText('What happens?'), 'Brother against brother');
-    await fireEvent.press(screen.getByRole('button', { name: 'Attack Karak' }));
-    expect(game.attack).toHaveBeenCalledWith('w1', {
+    // DOW-56: the other gods get the world's reaction window to respond.
+    expect(screen.getByText(/gives the other gods 12 hours to respond/)).toBeTruthy();
+    await fireEvent.press(screen.getByRole('button', { name: 'Declare war on Karak' }));
+    expect(game.declareAttack).toHaveBeenCalledWith('w1', {
       armyId: host.id,
       target: { kind: 'city', id: karak.id },
       attackerModifiers: ['Steel', 'Siege engines'],
@@ -903,6 +909,12 @@ describe('Cities and armies (DOW-48/54/55/41)', () => {
       utterlyDestroy: true,
       description: 'Brother against brother',
     });
+  });
+
+  it('won’t send an army already marching to battle (DOW-56)', async () => {
+    await render(<ActScreen />);
+    await openPower('Attack');
+    expect(screen.getByLabelText('Host of Karak · marching to battle')).toBeDisabled();
   });
 
   it('needs an army you can command, and a city', async () => {
