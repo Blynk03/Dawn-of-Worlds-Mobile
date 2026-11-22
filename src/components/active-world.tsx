@@ -110,6 +110,11 @@ export function ActiveWorld({ worldId, gods, members, myId, focusHex, gmFinalSay
         onPress={() => router.push(`/world/${worldId}/atlas`)}
       />
       <Button
+        title="How to play"
+        variant="secondary"
+        onPress={() => router.push(`/world/${worldId}/rules`)}
+      />
+      <Button
         title="World settings"
         variant="secondary"
         onPress={() => router.push(`/world/${worldId}/settings`)}

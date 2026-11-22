@@ -34,6 +34,7 @@ export default function AppLayout() {
         <Stack.Screen name="world/[id]/atlas" options={{ title: 'Atlas' }} />
         <Stack.Screen name="world/[id]/chronicle" options={{ title: 'Chronicle' }} />
         <Stack.Screen name="world/[id]/settings" options={{ title: 'World settings' }} />
+        <Stack.Screen name="world/[id]/rules" options={{ title: 'How to play' }} />
       </Stack>
     </>
   );
