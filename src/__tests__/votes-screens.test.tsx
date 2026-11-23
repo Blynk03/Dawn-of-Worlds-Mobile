@@ -429,3 +429,35 @@ describe('The GM (DOW-62)', () => {
     });
   });
 });
+
+describe('Events and catastrophes in the feed (DOW-49/50)', () => {
+  it('says what a catastrophe did', async () => {
+    const quake = {
+      ...base.actions[0],
+      power: 'catastrophe',
+      choice: 'Eruption',
+      hexes: [[4, 4]] as [number, number][],
+      fates: [{ id: 'c', kind: 'city', name: 'Karak', fate: 'destroyed' }],
+      advancementsLost: [{ id: 'x', entityId: 'c', field: 'Steel' }],
+    };
+    await render(
+      <FeedCard
+        worldId="w1"
+        action={quake}
+        view={base}
+        gods={gods}
+        members={[]}
+        myId="u-x"
+        comments={[]}
+        reactions={[]}
+        now={now}
+        objectionHours={0}
+        onChanged={jest.fn()}
+        onOpenEntity={jest.fn()}
+        onOpenHex={jest.fn()}
+      />,
+    );
+    expect(screen.getByText(/Catastrophe: Eruption \(1 hex\)/)).toBeTruthy();
+    expect(screen.getByText('⚠ Karak destroyed; Steel lost.')).toBeTruthy();
+  });
+});

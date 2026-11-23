@@ -931,3 +931,114 @@ describe('Cities and armies (DOW-48/54/55/41)', () => {
     expect(screen.getByText('No standing cities yet')).toBeTruthy();
   });
 });
+
+describe('Events and catastrophes (DOW-49/50)', () => {
+  const [dwarves] = view.races;
+  const karak = view.cities.find((c) => c.name === 'Karak')!;
+  const durin = view.avatars[0];
+  const steel = view.advancements.find((a) => a.field === 'Steel')!;
+
+  beforeEach(() => {
+    game.loadGameEvents.mockResolvedValue(eventsWithPower(60));
+    game.triggerEvent.mockResolvedValue();
+    game.catastrophe.mockResolvedValue();
+  });
+
+  it('strikes a civilization with an event, taking an advancement', async () => {
+    await render(<ActScreen />);
+    await openPower('Event');
+    await fireEvent.press(screen.getByLabelText('Technology lost'));
+    await fireEvent.press(screen.getByLabelText(dwarves.name));
+    await fireEvent.press(screen.getByLabelText('Steel lost'));
+    await fireEvent.changeText(screen.getByLabelText('What happens?'), 'The forges go cold');
+    expect(screen.getByText(`Technology lost strikes ${dwarves.name}`)).toBeTruthy();
+    expect(screen.getByText("Costs 10. You'll have 50 power left.")).toBeTruthy();
+    await fireEvent.press(screen.getByRole('button', { name: 'Make it happen' }));
+    expect(game.triggerEvent).toHaveBeenCalledWith('w1', {
+      targetKind: 'race',
+      targetId: dwarves.id,
+      kind: 'Technology lost',
+      loseAdvancement: steel.id,
+      fate: null,
+      description: 'The forges go cold',
+    });
+  });
+
+  it('can destroy a city utterly, for what it cost to found', async () => {
+    await render(<ActScreen />);
+    await openPower('Event');
+    await fireEvent.press(screen.getByLabelText('Something else'));
+    await fireEvent.changeText(screen.getByLabelText('What is it?'), 'Sinkhole');
+    await fireEvent.press(screen.getByLabelText('A city'));
+    await fireEvent.press(screen.getByLabelText('Karak'));
+    // Underhold lies in ruins already, so it isn't offered.
+    expect(screen.queryByLabelText('Underhold')).toBeNull();
+    await fireEvent.press(screen.getByLabelText('Destroy it utterly · +8'));
+    await fireEvent.changeText(screen.getByLabelText('What happens?'), 'The earth swallows it');
+    expect(screen.getByText("Costs 18. You'll have 42 power left.")).toBeTruthy();
+    await fireEvent.press(screen.getByRole('button', { name: 'Make it happen' }));
+    expect(game.triggerEvent).toHaveBeenCalledWith(
+      'w1',
+      expect.objectContaining({
+        targetKind: 'city',
+        targetId: karak.id,
+        kind: 'Sinkhole',
+        fate: 'destroyed',
+      }),
+    );
+  });
+
+  it('slays an avatar', async () => {
+    await render(<ActScreen />);
+    await openPower('Event');
+    await fireEvent.press(screen.getByLabelText('An avatar'));
+    await fireEvent.press(screen.getByLabelText(durin.name));
+    await fireEvent.press(screen.getByLabelText('Slay the avatar'));
+    await fireEvent.changeText(screen.getByLabelText('What happens?'), 'A plague takes him');
+    await fireEvent.press(screen.getByRole('button', { name: 'Make it happen' }));
+    expect(game.triggerEvent).toHaveBeenCalledWith(
+      'w1',
+      expect.objectContaining({ targetKind: 'avatar', targetId: durin.id, fate: 'slain' }),
+    );
+  });
+
+  it('unleashes a catastrophe on hexes chosen on the map', async () => {
+    await render(<ActScreen />);
+    await openPower('Catastrophe');
+    await fireEvent.press(screen.getByLabelText('Eruption'));
+    // Karak's hex and the Dwarves' homeland, where Durin stands.
+    await fireEvent.press(screen.getByLabelText(`hex ${karak.hex.x},${karak.hex.y}`));
+    await fireEvent.press(screen.getByLabelText(`hex ${durin.hex.x},${durin.hex.y}`));
+    expect(screen.getByText('Eruption strikes 2 hexes')).toBeTruthy();
+    await fireEvent.press(screen.getByLabelText('Mountains'));
+    expect(screen.getByText('Caught in it')).toBeTruthy();
+    await fireEvent.press(screen.getByLabelText('Ruined'));
+    await fireEvent.press(screen.getByLabelText('Slain'));
+    await fireEvent.press(screen.getByLabelText(`Steel (${dwarves.name})`));
+    await fireEvent.changeText(screen.getByLabelText('What happens?'), 'The mountain wakes');
+    expect(screen.getByText("Costs 20. You'll have 40 power left.")).toBeTruthy();
+    await fireEvent.press(screen.getByRole('button', { name: 'Unleash it' }));
+    expect(game.catastrophe).toHaveBeenCalledWith('w1', {
+      hexes: [
+        [karak.hex.x, karak.hex.y],
+        [durin.hex.x, durin.hex.y],
+      ],
+      kind: 'Eruption',
+      terrain: 'mountains',
+      fates: [
+        { id: karak.id, fate: 'ruined' },
+        { id: durin.id, fate: 'slain' },
+      ],
+      lostAdvancements: [steel.id],
+      description: 'The mountain wakes',
+    });
+  });
+
+  it('strikes at most 7 hexes', async () => {
+    await render(<ActScreen />);
+    await openPower('Catastrophe');
+    for (let x = 0; x < 8; x++) await fireEvent.press(screen.getByLabelText(`hex ${x},0`));
+    expect(screen.getByText('Choose at most 7 hexes.')).toBeTruthy();
+    expect(screen.getByText('Earthquake strikes 7 hexes')).toBeTruthy();
+  });
+});

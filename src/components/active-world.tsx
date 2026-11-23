@@ -15,7 +15,7 @@ import type { God } from '@/lib/database.types';
 import { useLayoutMode } from '@/hooks/use-layout-mode';
 import { SIDE_PANEL_WIDTH } from '@/layout/breakpoints';
 import { type Hex, hexIndex } from '@/map/hex';
-import { mapMarkers } from '@/map/markers';
+import { catastropheScars, mapMarkers } from '@/map/markers';
 import type { LobbyMember } from '@/worlds/api';
 
 type Props = {
@@ -55,6 +55,7 @@ export function ActiveWorld({ worldId, gods, members, myId, focusHex, gmFinalSay
   const onMap = linked && map && linked.x < map.width && linked.y < map.height ? linked : null;
   const myGod = gods.find((g) => g.user_id === myId);
   const markers = useMemo(() => mapMarkers(game.view, gods), [game.view, gods]);
+  const scars = useMemo(() => catastropheScars(game.view), [game.view]);
 
   const mapArea = (
     <View style={styles.fill}>
@@ -64,6 +65,7 @@ export function ActiveWorld({ worldId, gods, members, myId, focusHex, gmFinalSay
           markers={markers}
           centerOn={onMap}
           focused={inspected ? hexIndex(inspected, map.width) : null}
+          scars={scars}
           onTapHex={setInspected}
           onLongPressHex={setInspected}
         />

@@ -364,6 +364,29 @@ export type Database = {
         Returns: string | null;
       };
       delete_my_account: { Args: Record<string, never>; Returns: undefined };
+      trigger_event: {
+        Args: {
+          target_world: string;
+          target_kind: string;
+          target: string;
+          event_kind: string;
+          effect: Json;
+          description: string;
+        };
+        Returns: number;
+      };
+      catastrophe: {
+        Args: {
+          target_world: string;
+          hexes: Json;
+          catastrophe_kind: string;
+          new_terrain: string | null;
+          fates: Json;
+          lost_advancements: Json;
+          description: string;
+        };
+        Returns: number;
+      };
       gm_rule: {
         Args: { target_world: string; proposal: string; choice: string; note: string };
         Returns: string;

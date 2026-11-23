@@ -65,6 +65,10 @@ export type ActionRecord = HexChange & {
   target: ActionTarget | null;
   /** For an attack: the battles and their outcome. */
   battle: BattleView | null;
+  /** DOW-49/50: what an event or catastrophe did to those it struck. */
+  fates: FateView[];
+  /** DOW-49/50: advancements lost to an event or catastrophe. */
+  advancementsLost: { id: string; entityId: string; field: string }[];
   /** For Command Avatar: the avatar that acted. */
   avatar: { id: string; name: string } | null;
   /** For Purify / Corrupt: the target's alignment afterwards. */
@@ -77,6 +81,15 @@ export type ActionRecord = HexChange & {
   retconned: boolean;
   /** The undone action this was undone along with, because it built on it. */
   undoneBecauseOf: number | null;
+};
+
+/** DOW-49/50: what became of something struck by an event or catastrophe. */
+export type FateView = {
+  id: string;
+  kind: string;
+  name: string;
+  /** ruined, scattered, slain (an avatar), disbanded (an order) or destroyed. */
+  fate: string;
 };
 
 /** DOW-52/53/54: a vote: on the next age, an objection to an action, or a disputed battle bonus. */
@@ -489,6 +502,8 @@ export function applyEvent(view: GameView, event: GameEvent): GameView {
         hexes,
         intent: str(p.intent),
         battle: battleOf(p.battle),
+        fates: fatesOf(p.fates),
+        advancementsLost: lostOf(p.advancements_lost),
         avatar: (() => {
           const a = asObj(p.avatar);
           const id = str(a.id);
@@ -674,6 +689,31 @@ export function applyEvent(view: GameView, event: GameEvent): GameView {
           ];
         }
       }
+      // DOW-49/50: events and catastrophes.
+      if (action.fates.length > 0) {
+        const statusOf = (id: string) => {
+          const f = action.fates.find((x) => x.id === id);
+          return f ? (f.fate === 'ruined' || f.fate === 'scattered' ? f.fate : 'destroyed') : null;
+        };
+        next.cities = next.cities.map((c) => {
+          const status = statusOf(c.id);
+          return status === 'ruined' || status === 'destroyed' ? { ...c, status } : c;
+        });
+        next.armies = next.armies.map((a) => {
+          const status = statusOf(a.id);
+          return status === 'scattered' || status === 'destroyed' ? { ...a, status } : a;
+        });
+        next.avatars = next.avatars.map((a) =>
+          statusOf(a.id) ? { ...a, status: 'destroyed' as const } : a,
+        );
+        next.orders = next.orders.map((o) =>
+          statusOf(o.id) ? { ...o, status: 'destroyed' as const } : o,
+        );
+      }
+      if (action.advancementsLost.length > 0) {
+        const lost = new Set(action.advancementsLost.map((a) => a.id));
+        next.advancements = next.advancements.filter((a) => !lost.has(a.id));
+      }
       // DOW-46: Purify / Corrupt. The server sends the new value.
       const alignment = asObj(p.alignment);
       if (action.target && typeof alignment.after === 'number') {
@@ -692,6 +732,8 @@ export function applyEvent(view: GameView, event: GameEvent): GameView {
             : action.power === 'shapeClimate'
               ? 'climate'
               : null;
+        // DOW-50: a catastrophe may leave new terrain.
+        const quake = action.power === 'catastrophe' ? str(p.terrain) : null;
         const map = {
           ...view.map,
           terrain: [...view.map.terrain],
@@ -703,6 +745,7 @@ export function applyEvent(view: GameView, event: GameEvent): GameView {
           if (x < 0 || y < 0 || x >= map.width || y >= map.height) continue;
           const index = y * map.width + x;
           if (layer) map[layer][index] = action.choice;
+          if (quake) map.terrain[index] = quake;
           if (action.target?.kind === 'region' && typeof alignment.after === 'number') {
             map.alignment[index] = alignment.after;
           }
@@ -984,6 +1027,33 @@ const PROPOSAL_STATUSES: ProposalView['status'][] = [
   'undone',
   'dropped',
 ];
+
+function fatesOf(value: unknown): FateView[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((v) => {
+    const f = asObj(v);
+    const id = str(f.id);
+    return id
+      ? [
+          {
+            id,
+            kind: str(f.kind) ?? '',
+            name: str(f.name) ?? '',
+            fate: str(f.fate) ?? str(f.status) ?? '',
+          },
+        ]
+      : [];
+  });
+}
+
+function lostOf(value: unknown): ActionRecord['advancementsLost'] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((v) => {
+    const a = asObj(v);
+    const id = str(a.id);
+    return id ? [{ id, entityId: str(a.entity_id) ?? '', field: str(a.field) ?? '' }] : [];
+  });
+}
 
 function withBonus(
   battles: DeclaredBattleView[],

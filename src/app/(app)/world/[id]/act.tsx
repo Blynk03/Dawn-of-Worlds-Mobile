@@ -20,6 +20,7 @@ import {
   OrderPicker,
 } from '@/components/order-avatar-forms';
 import { AttackForm, CommandCityForm, MarchForm, type WarTarget } from '@/components/war-forms';
+import { CatastropheForm, EventForm } from '@/components/fate-forms';
 import { useAuth } from '@/auth/auth-provider';
 import { Button, TextField } from '@/components/form';
 import { Chip, ErrorMessage, SectionLabel } from '@/components/game-ui';
@@ -29,6 +30,7 @@ import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import {
   advance,
+  catastrophe,
   changeAlignment,
   commandAvatar,
   commandCity,
@@ -41,6 +43,7 @@ import {
   foundCity,
   marchArmy,
   resurrectAvatar,
+  triggerEvent,
   takeAction,
 } from '@/game/api';
 import {
@@ -66,6 +69,8 @@ import type { Age } from '@/rules/schema';
 import { useLobby } from '@/worlds/hooks';
 
 const MAX_HEXES = 64;
+/** DOW-50: a catastrophe strikes at most 7 hexes. */
+const MAX_CATASTROPHE_HEXES = 7;
 
 /** Which form to show: a power's own, or (for Command Avatar) the one its action uses. */
 type FormKind = ActKind | 'deed';
@@ -295,11 +300,16 @@ export default function ActScreen() {
   const onTapHex = (tapped: Hex) => {
     const index = hexIndex(tapped, map.width);
     setNote(null);
-    if (fk === 'shapeLand' || fk === 'shapeClimate') {
+    if (fk === 'shapeLand' || fk === 'shapeClimate' || fk === 'catastrophe') {
+      const max = fk === 'catastrophe' ? MAX_CATASTROPHE_HEXES : MAX_HEXES;
+      if (!selected.has(index) && selected.size >= max) {
+        setNote(`Choose at most ${max} hexes.`);
+        return;
+      }
       setSelected((current) => {
         const next = new Set(current);
         if (next.has(index)) next.delete(index);
-        else if (next.size < MAX_HEXES) next.add(index);
+        else next.add(index);
         return next;
       });
     } else if (fk === 'createRace') {
@@ -404,6 +414,13 @@ export default function ActScreen() {
     kind === 'shapeLand'
       ? TERRAINS[c as keyof typeof TERRAINS].name
       : CLIMATES[c as keyof typeof CLIMATES].name;
+
+  // DOW-41/49/50: wiping something out costs what it cost to create.
+  const destructionPrices = {
+    order: priceOf('createOrder'),
+    city: priceOf('commandRace'),
+    army: priceOf('commandCity'),
+  };
 
   let form: ReactNode = null;
   if (shaping) {
@@ -750,7 +767,32 @@ export default function ActScreen() {
     );
   }
 
-  if (fk === 'commandCity') {
+  if (fk === 'event') {
+    form = (
+      <EventForm
+        view={view}
+        cost={cost}
+        prices={destructionPrices}
+        power={myPower}
+        busy={busy}
+        onSubmit={(order) => run(() => triggerEvent(id, order))}
+      />
+    );
+  } else if (fk === 'catastrophe') {
+    form = (
+      <CatastropheForm
+        view={view}
+        mapWidth={map.width}
+        selected={selected}
+        perHex={priceOf('catastrophe')}
+        prices={destructionPrices}
+        power={myPower}
+        busy={busy}
+        onClear={() => setSelected(new Set())}
+        onSubmit={(order) => run(() => catastrophe(id, order))}
+      />
+    );
+  } else if (fk === 'commandCity') {
     form = (
       <CommandCityForm
         view={view}
@@ -1084,7 +1126,12 @@ export default function ActScreen() {
         : fk === 'commandOrder' || fk === 'deed' || fk === 'resurrectAvatar' || fk === 'createOrder'
           ? null
           : hex;
-  const mapSelection = shaping ? selected : pickedHex === null ? undefined : new Set([pickedHex]);
+  const mapSelection =
+    shaping || fk === 'catastrophe'
+      ? selected
+      : pickedHex === null
+        ? undefined
+        : new Set([pickedHex]);
   const mapView = (
     <View style={styles.fill}>
       <HexMap

@@ -25,8 +25,8 @@ describe('powerTable (DOW-78)', () => {
     expect(byId('shapeLand').notes).toEqual(['per hex']);
     expect(byId('commandRace').notes).toEqual(['needs your order or avatar among them']);
     expect(byId('purifyCity').notes).toEqual(['once per target each turn']);
-    expect(byId('catastrophe')).toMatchObject({ comingSoon: true, now: 10 });
-    expect(byId('event').comingSoon).toBe(true);
+    expect(byId('catastrophe')).toMatchObject({ comingSoon: false, now: 10, notes: ['per hex'] });
+    expect(byId('event')).toMatchObject({ comingSoon: false, now: 10 });
   });
 });
 

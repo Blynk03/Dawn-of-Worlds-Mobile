@@ -97,7 +97,8 @@ describe('How to play (DOW-78)', () => {
     expect(screen.getByLabelText('Shape Land: 3')).toBeTruthy();
     // Command Race and Command City need presence.
     expect(screen.getAllByText(/needs your order or avatar among them/)).toHaveLength(2);
-    expect(screen.getAllByText(/coming to the app soon/)).toHaveLength(2); // Event, Catastrophe
+    expect(screen.queryByText(/coming to the app soon/)).toBeNull(); // every power is playable
+    expect(screen.getByLabelText('Catastrophe: 10')).toBeTruthy();
   });
 
   it('uses this world’s settings', async () => {

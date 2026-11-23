@@ -67,3 +67,17 @@ export function mapMarkers(
       }),
   ];
 }
+
+/** DOW-50: hexes struck by a catastrophe this round (shown scorched on the map until it ends). */
+export function catastropheScars(view: GameView): ReadonlySet<number> {
+  const width = view.map?.width ?? 0;
+  const scars = new Set<number>();
+  if (!width) return scars;
+  for (const a of view.actions) {
+    if (a.power !== 'catastrophe' || a.retconned || a.age !== view.age || a.round !== view.round) {
+      continue;
+    }
+    for (const [x, y] of a.hexes) scars.add(y * width + x);
+  }
+  return scars;
+}

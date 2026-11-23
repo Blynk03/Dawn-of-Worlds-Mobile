@@ -4,6 +4,7 @@ import { type GameEvent, projectWorld } from '@/game/project';
 import {
   actionEntities,
   describeAction,
+  fatesSummary,
   filterableEntities,
   historyRows,
   timeAgo,
@@ -147,6 +148,37 @@ describe('History Chart (DOW-36)', () => {
       describeAction({ ...deed, intent: 'raiseArmy', target: raise.target, choice: 'Wardens' })
         .what,
     ).toBe('Durin bids Karak raise Wardens');
+  });
+
+  it('describes events and catastrophes, and what they struck (DOW-49/50)', () => {
+    const base = view.actions[0];
+    const plague = {
+      ...base,
+      power: 'event',
+      choice: 'Plague',
+      target: { kind: 'avatar' as const, id: 'a1', key: 'a1', name: 'Durin' },
+      fates: [{ id: 'a1', kind: 'avatar', name: 'Durin', fate: 'slain' }],
+      advancementsLost: [],
+    };
+    expect(describeAction(plague)).toEqual({ power: 'Event', what: 'Plague strikes Durin' });
+    expect(fatesSummary(plague)).toBe('Durin slain');
+    const quake = {
+      ...base,
+      power: 'catastrophe',
+      choice: 'Earthquake',
+      hexes: [
+        [1, 1],
+        [1, 2],
+      ] as [number, number][],
+      fates: [
+        { id: 'c1', kind: 'city', name: 'Karak', fate: 'ruined' },
+        { id: 'r1', kind: 'army', name: 'Host', fate: 'destroyed' },
+      ],
+      advancementsLost: [{ id: 'x', entityId: 'c1', field: 'Steel' }],
+    };
+    expect(describeAction(quake)).toEqual({ power: 'Catastrophe', what: 'Earthquake (2 hexes)' });
+    expect(fatesSummary(quake)).toBe('Karak left in ruins, Host destroyed; Steel lost');
+    expect(fatesSummary({ ...quake, fates: [], advancementsLost: [] })).toBeNull();
   });
 
   it('knows which races and cities an action involves', () => {

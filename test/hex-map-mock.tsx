@@ -7,6 +7,7 @@ type Props = {
   markers?: readonly { index: number; kind: string; label: string }[];
   candidates?: ReadonlySet<number>;
   selected?: ReadonlySet<number>;
+  scars?: ReadonlySet<number>;
   onTapHex?: (hex: { x: number; y: number }) => void;
   onLongPressHex?: (hex: { x: number; y: number }) => void;
 };
@@ -14,13 +15,22 @@ type Props = {
 const list = (set?: ReadonlySet<number>) =>
   [...(set ?? [])].sort((a, b) => a - b).join(',') || 'none';
 
-export function HexMap({ map, markers, candidates, selected, onTapHex, onLongPressHex }: Props) {
+export function HexMap({
+  map,
+  markers,
+  candidates,
+  selected,
+  scars,
+  onTapHex,
+  onLongPressHex,
+}: Props) {
   const shown = Array.from({ length: Math.min(100, map.width * map.height) }, (_, i) => i);
   return (
     <View testID="hex-map">
       <Text>{`map ${map.width}x${map.height}`}</Text>
       <Text>{`selected ${list(selected)}`}</Text>
       <Text>{`candidates ${list(candidates)}`}</Text>
+      {scars && scars.size > 0 ? <Text>{`scars ${list(scars)}`}</Text> : null}
       {(markers ?? []).map((m) => (
         <Text key={`${m.kind}${m.index}`}>{`marker ${m.kind} ${m.label} at ${m.index}`}</Text>
       ))}

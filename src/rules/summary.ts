@@ -12,8 +12,8 @@ export const POWER_GROUPS: { category: Power['category']; title: string }[] = [
   { category: 'fate', title: 'Fate' },
 ];
 
-/** Powers in the rules that the app can't use yet. */
-export const COMING_SOON = new Set(['event', 'catastrophe']);
+/** Powers in the rules that the app can't use yet (none, since DOW-49/50). */
+export const COMING_SOON = new Set<string>();
 
 export type PowerRow = {
   id: string;

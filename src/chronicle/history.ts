@@ -24,7 +24,27 @@ export const POWER_NAMES: Record<string, string> = {
   createAvatar: 'Create Avatar',
   commandAvatar: 'Command Avatar',
   resurrectAvatar: 'Resurrect Avatar',
+  event: 'Event',
+  catastrophe: 'Catastrophe',
 };
+
+const FATE_WORDS: Record<string, string> = {
+  ruined: 'left in ruins',
+  scattered: 'scattered',
+  slain: 'slain',
+  disbanded: 'broken up',
+  destroyed: 'destroyed',
+};
+
+/** DOW-49/50: "Emberfall destroyed, Cinder slain; Masonry lost". */
+export function fatesSummary(action: ActionRecord): string | null {
+  const parts = action.fates.map((f) => `${f.name} ${FATE_WORDS[f.fate] ?? f.fate}`);
+  const lost = action.advancementsLost.map((a) => a.field);
+  if (parts.length === 0 && lost.length === 0) return null;
+  return [parts.join(', '), lost.length > 0 ? `${lost.join(', ')} lost` : '']
+    .filter(Boolean)
+    .join('; ');
+}
 
 /** DOW-48: "Karak builds The Iron Wall", "Karak raises the Host of Karak". */
 function cityDeed(action: ActionRecord, verbs: [string, string] = ['raises', 'builds']): string {
@@ -89,7 +109,12 @@ export function describeAction(action: ActionRecord): { power: string; what: str
     what = `${action.choice} marched to (${x}, ${y})`;
   } else if (action.intent === 'attack') what = attackDeed(action);
   else if (action.power === 'resurrectAvatar') what = `${action.choice} returns`;
-  else if (action.power.startsWith('advance') && action.target) {
+  else if (action.power === 'event' && action.target) {
+    what = `${action.choice} strikes ${action.target.name}`;
+  } else if (action.power === 'catastrophe') {
+    const n = action.hexes.length;
+    what = `${action.choice} (${n} ${n === 1 ? 'hex' : 'hexes'})`;
+  } else if (action.power.startsWith('advance') && action.target) {
     what = `${action.target.name}, the greatest at ${action.choice}`;
   } else if (/^(purify|corrupt)/.test(action.power) && action.alignmentAfter !== null) {
     const after = action.alignmentAfter;
@@ -149,6 +174,19 @@ export function actionEntities(view: GameView, action: ActionRecord): EntityRef[
       raceRef(city.raceId);
       add({ id: city.id, kind: 'city', name: city.name });
     }
+  }
+  // DOW-49/50: whatever an event or catastrophe struck.
+  if (action.target?.kind === 'avatar') {
+    raceRef(view.avatars.find((x) => x.id === action.target!.id)?.raceId ?? null);
+  }
+  for (const fate of action.fates) {
+    const city = view.cities.find((c) => c.id === fate.id);
+    if (city) {
+      raceRef(city.raceId);
+      add({ id: city.id, kind: 'city', name: city.name });
+    }
+    if (fate.kind === 'army') armyCity(fate.id);
+    if (fate.kind === 'avatar') raceRef(view.avatars.find((x) => x.id === fate.id)?.raceId ?? null);
   }
   for (const city of view.cities) {
     if (city.createdSeq !== action.seq) continue;

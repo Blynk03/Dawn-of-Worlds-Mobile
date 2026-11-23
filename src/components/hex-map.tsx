@@ -39,6 +39,8 @@ type HexMapProps = {
   selected?: ReadonlySet<number>;
   /** Hex indexes to outline more subtly (e.g. the hex whose history is open). */
   focused?: number | null;
+  /** DOW-50: hexes struck by a catastrophe this round, scorched red. */
+  scars?: ReadonlySet<number>;
   onTapHex?: (hex: Hex) => void;
   onLongPressHex?: (hex: Hex) => void;
 };
@@ -55,6 +57,7 @@ export function HexMap({
   centerOn,
   selected,
   focused,
+  scars,
   onTapHex,
   onLongPressHex,
 }: HexMapProps) {
@@ -193,6 +196,7 @@ export function HexMap({
               candidates={candidates}
               selected={selected}
               focused={focused ?? null}
+              scars={scars}
               width={pixels.width}
               height={pixels.height}
             />
@@ -368,6 +372,7 @@ function HighlightLayer({
   candidates,
   selected,
   focused,
+  scars,
   width,
   height,
 }: {
@@ -375,18 +380,30 @@ function HighlightLayer({
   candidates?: ReadonlySet<number>;
   selected?: ReadonlySet<number>;
   focused: number | null;
+  scars?: ReadonlySet<number>;
   width: number;
   height: number;
 }) {
   if (
     (!selected || selected.size === 0) &&
     (!candidates || candidates.size === 0) &&
+    (!scars || scars.size === 0) &&
     focused === null
   ) {
     return null;
   }
   return (
     <Svg width={width} height={height} style={StyleSheet.absoluteFill} pointerEvents="none">
+      {[...(scars ?? [])].map((index) => (
+        <Polygon
+          key={`x${index}`}
+          points={hexCorners(hexFromIndex(index, map.width), HEX_SIZE)}
+          fill="rgba(185,28,28,0.28)"
+          stroke="#B91C1C"
+          strokeWidth={2}
+          strokeDasharray="5 3"
+        />
+      ))}
       {[...(candidates ?? [])].map((index) => (
         <Polygon
           key={`c${index}`}
