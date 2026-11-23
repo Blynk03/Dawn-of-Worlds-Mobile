@@ -568,3 +568,54 @@ export async function gmSetRules(worldId: string, rules: GmRules): Promise<void>
   });
   if (error) throw new Error(friendlyError(error));
 }
+
+export type EventOrder = {
+  targetKind: 'avatar' | 'order' | 'city' | 'race';
+  targetId: string;
+  /** "Plague", "Gold found"… */
+  kind: string;
+  /** An advancement of the target's to take away. */
+  loseAdvancement: string | null;
+  /** What becomes of the target, if anything. */
+  fate: 'slain' | 'disbanded' | 'ruined' | 'destroyed' | null;
+  description: string;
+};
+
+/** DOW-49: an event strikes an avatar, order, city or civilization. */
+export async function triggerEvent(worldId: string, order: EventOrder): Promise<void> {
+  const { error } = await client().rpc('trigger_event', {
+    target_world: worldId,
+    target_kind: order.targetKind,
+    target: order.targetId,
+    event_kind: order.kind,
+    effect: { lose_advancement: order.loseAdvancement, fate: order.fate },
+    description: order.description,
+  });
+  if (error) throw new Error(friendlyError(error));
+}
+
+export type CatastropheOrder = {
+  hexes: [number, number][];
+  kind: string;
+  /** New terrain for the stricken hexes, or null to leave it. */
+  terrain: string | null;
+  /** What becomes of each city, army and avatar struck; anything left out is spared. */
+  fates: { id: string; fate: 'ruined' | 'scattered' | 'slain' | 'destroyed' }[];
+  /** Advancements lost (of cities and civilizations on those hexes). */
+  lostAdvancements: string[];
+  description: string;
+};
+
+/** DOW-50: a catastrophe strikes up to 7 hexes. */
+export async function catastrophe(worldId: string, order: CatastropheOrder): Promise<void> {
+  const { error } = await client().rpc('catastrophe', {
+    target_world: worldId,
+    hexes: order.hexes,
+    catastrophe_kind: order.kind,
+    new_terrain: order.terrain,
+    fates: order.fates,
+    lost_advancements: order.lostAdvancements,
+    description: order.description,
+  });
+  if (error) throw new Error(friendlyError(error));
+}

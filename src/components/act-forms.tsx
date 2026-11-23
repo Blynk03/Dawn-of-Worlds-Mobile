@@ -21,6 +21,8 @@ export type ActKind =
   | 'commandCity'
   | 'march'
   | 'attack'
+  | 'event'
+  | 'catastrophe'
   | 'createAvatar'
   | 'commandAvatar'
   | 'resurrectAvatar';
@@ -149,6 +151,22 @@ export const ACT_OPTIONS: ActOption[] = [
     perHex: false,
   },
   {
+    kind: 'event',
+    power: 'event',
+    category: 'Fate',
+    name: 'Event',
+    blurb: 'Gold found, plague, famine, a storm: strike an avatar, order, city or civilization.',
+    perHex: false,
+  },
+  {
+    kind: 'catastrophe',
+    power: 'catastrophe',
+    category: 'Fate',
+    name: 'Catastrophe',
+    blurb: 'Earthquake, eruption, flood: reshape up to 7 hexes and ruin what stands there.',
+    perHex: true,
+  },
+  {
     kind: 'createAvatar',
     power: 'createAvatar',
     category: 'Avatars',
@@ -209,7 +227,7 @@ export function PowerPicker({
         </View>
       ))}
       <ThemedText type="small" themeColor="textSecondary">
-        Events, catastrophes and table votes on battles arrive in later updates.
+        Pooled race creation and table sessions arrive in later updates.
       </ThemedText>
     </View>
   );

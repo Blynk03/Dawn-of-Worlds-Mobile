@@ -1,7 +1,7 @@
 import { projectWorld, type GameEvent } from '@/game/project';
 import fixture from '@/game/__tests__/fixtures/server-game.json';
 
-import { mapMarkers } from '../markers';
+import { catastropheScars, mapMarkers } from '../markers';
 
 describe('mapMarkers', () => {
   const view = projectWorld(fixture.events as GameEvent[]);
@@ -48,5 +48,34 @@ describe('mapMarkers', () => {
     const live = mapMarkers(view, []).filter((m) => !m.ruined);
     expect(live.every((m) => m.color === '#6B7280')).toBe(true);
     expect(mapMarkers({ ...view, map: null }, gods)).toEqual([]);
+  });
+});
+
+describe('catastropheScars (DOW-50)', () => {
+  const view = projectWorld(fixture.events as GameEvent[]);
+  const quake = {
+    ...view.actions[0],
+    power: 'catastrophe',
+    age: view.age,
+    round: view.round,
+    hexes: [
+      [1, 2],
+      [3, 0],
+    ] as [number, number][],
+    retconned: false,
+  };
+  const width = view.map!.width;
+
+  it('marks the hexes a catastrophe struck this round', () => {
+    expect([...catastropheScars({ ...view, actions: [...view.actions, quake] })]).toEqual([
+      2 * width + 1,
+      3,
+    ]);
+  });
+
+  it('fades with the round, and ignores undone catastrophes', () => {
+    expect(catastropheScars({ ...view, actions: [quake], round: view.round + 1 }).size).toBe(0);
+    expect(catastropheScars({ ...view, actions: [{ ...quake, retconned: true }] }).size).toBe(0);
+    expect(catastropheScars(view).size).toBe(0);
   });
 });

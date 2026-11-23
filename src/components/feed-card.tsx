@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
-import { actionEntities, describeAction, timeAgo } from '@/chronicle/history';
+import { actionEntities, describeAction, fatesSummary, timeAgo } from '@/chronicle/history';
 import {
   addComment,
   deleteComment,
@@ -154,6 +154,12 @@ export function FeedCard({
             onChanged={onChanged}
           />
           {action.battle ? <BattleSummary battle={action.battle} target={action.choice} /> : null}
+          {fatesSummary(action) ? (
+            <ThemedText type="smallBold" themeColor="accent">
+              {action.power === 'catastrophe' ? '⚠ ' : ''}
+              {fatesSummary(action)}.
+            </ThemedText>
+          ) : null}
           {entities.length > 0 ? (
             <View style={styles.row}>
               {entities.map((e) => (

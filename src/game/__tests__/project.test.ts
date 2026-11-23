@@ -534,6 +534,78 @@ describe('applying events incrementally', () => {
     expect(next.ageChanges).toEqual([{ age: 2, name: 'Second Age', round: 9, seq }]);
   });
 
+  it('applies events and catastrophes (DOW-49/50)', () => {
+    const base = projectWorld(events);
+    const [dwarves] = base.races;
+    const karak = base.cities.find((c) => c.name === 'Karak')!;
+    const host = base.armies.find((a) => a.name === 'Host of Karak')!;
+    const durin = base.avatars[0];
+    const steel = base.advancements.find((a) => a.field === 'Steel')!;
+    const god = base.turnOrder[0];
+    let seq = base.lastSeq;
+    const act = (payload: Record<string, unknown>): GameEvent => ({
+      seq: ++seq,
+      type: 'action_taken',
+      age: base.age,
+      round: base.round,
+      god_id: god,
+      payload,
+      created_at: '2026-11-05T00:00:00Z',
+    });
+    // Payloads as trigger_event() and catastrophe() log them.
+    const plague = act({
+      power: 'event',
+      cost: 10,
+      hexes: [[durin.hex.x, durin.hex.y]],
+      choice: 'Plague',
+      description: 'Even kings sicken',
+      power_after: 20,
+      target: { kind: 'avatar', id: durin.id, name: durin.name },
+      event_kind: 'Plague',
+      fates: [
+        { id: durin.id, kind: 'avatar', name: durin.name, status: 'destroyed', fate: 'slain' },
+      ],
+      advancements_lost: [],
+      destruction_cost: 0,
+    });
+    const quake = act({
+      power: 'catastrophe',
+      cost: 20 + 8 + 6,
+      hexes: [
+        [karak.hex.x, karak.hex.y],
+        [host.hex.x, host.hex.y],
+      ],
+      choice: 'Earthquake',
+      description: 'The ground splits',
+      power_after: 0,
+      catastrophe_kind: 'Earthquake',
+      terrain: 'hills',
+      fates: [
+        { id: karak.id, kind: 'city', name: 'Karak', status: 'destroyed', fate: 'destroyed' },
+        {
+          id: host.id,
+          kind: 'army',
+          name: 'Host of Karak',
+          status: 'scattered',
+          fate: 'scattered',
+        },
+      ],
+      advancements_lost: [{ id: steel.id, entity_id: dwarves.id, field: 'Steel' }],
+      destruction_cost: 14,
+    });
+    const after = projectWorld([plague, quake], base);
+    expect(after.avatars[0].status).toBe('destroyed');
+    expect(after.cities.find((c) => c.id === karak.id)!.status).toBe('destroyed');
+    expect(after.armies.find((a) => a.id === host.id)!.status).toBe('scattered');
+    expect(after.advancements.some((a) => a.id === steel.id)).toBe(false);
+    const width = after.map!.width;
+    expect(after.map!.terrain[karak.hex.y * width + karak.hex.x]).toBe('hills');
+    const [e, c] = after.actions.slice(-2);
+    expect(e.fates).toEqual([{ id: durin.id, kind: 'avatar', name: durin.name, fate: 'slain' }]);
+    expect(c.advancementsLost).toEqual([{ id: steel.id, entityId: dwarves.id, field: 'Steel' }]);
+    expect(after.hexHistory[karak.hex.y * width + karak.hex.x]).toContain(c.seq);
+  });
+
   it('records the GM’s rulings (DOW-62)', () => {
     const base = projectWorld(events);
     const objection = base.proposals.find((p) => p.kind === 'objection')!;
