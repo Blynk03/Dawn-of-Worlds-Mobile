@@ -173,6 +173,11 @@ export default function WorldScreen() {
           variant={myGod ? 'secondary' : 'primary'}
           onPress={() => router.push(`/world/${world.id}/god`)}
         />
+        <Button
+          title="How to play"
+          variant="secondary"
+          onPress={() => router.push(`/world/${world.id}/rules`)}
+        />
 
         {isHost && inLobby ? (
           <Card>

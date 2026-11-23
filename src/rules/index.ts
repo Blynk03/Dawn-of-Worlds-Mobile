@@ -8,3 +8,4 @@ export * from './dice';
 export * from './power';
 export * from './ruleset';
 export * from './schema';
+export * from './summary';

@@ -1053,7 +1053,14 @@ export default function ActScreen() {
           <ErrorMessage message={error} />
         </>
       ) : (
-        <PowerPicker costs={costLabels} disabledReasons={disabledReasons} onPick={pick} />
+        <>
+          <Button
+            title="How to play: powers and rules"
+            variant="secondary"
+            onPress={() => router.push(`/world/${id}/rules`)}
+          />
+          <PowerPicker costs={costLabels} disabledReasons={disabledReasons} onPick={pick} />
+        </>
       )}
     </ScrollView>
   );
